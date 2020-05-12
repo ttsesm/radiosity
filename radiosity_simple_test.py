@@ -1,5 +1,6 @@
 import numpy as np
 import numexpr as ne
+import numpy.matlib
 import matplotlib.pylab as plt
 from scipy.linalg import norm
 import time
@@ -388,12 +389,44 @@ def main():
     # describes the contribution of emitted light in the scene. For example,
     # each pixel belonging to a lamp in the virtual space causes a positive
     # element in Evec.
-    Evec   = np.zeros(5*width,1)
-    indvec = repmat(logical(0),size(Evec))
-    indvec(n^2+[1:n^2]) = sqrt((Xmat(:,2)-.3).^2+Ymat(:,2).^2)<.3
-    Evec(indvec) = 1
+    Evec = np.zeros(5*width)
+    Evec[width + 1:width + 1 + width] = (np.array(np.sqrt((Xmat[:, 1] - 0.3) ** 2 + (Ymat[:, 1]) ** 2)) < 0.3)
+    # indvec = np.full(Evec.shape, False)
+    # indvec[width+1:width+1+width] = (np.array(np.sqrt((Xmat[:,1]-0.3)**2 + (Ymat[:,1])**2)) < 0.3)
+    # Evec[indvec] = 1
     # Evec(n^2+round(n^2/2)-2) = 1;
     # Evec(3*n^2+round(n^2/2)-2) = 1;
+
+    # Solve for color vector.
+    # The parameter rho adjusts the surface material(how much incoming light
+    # is reflected away from a patch, 0 < rho <= 1)
+    rho = 1
+    colorvec = np.dot(np.linalg.inv((np.eye(5 * n ** 2) - rho * F)), Evec.reshape(-1, 1))
+
+    # Normalize the values of the color vector between 0 and 1.
+    colorvec[colorvec < 0] = 0
+    colorvec = colorvec / np.amax(colorvec)
+
+    # The cut_param below is for preventing the lamp color being too far away
+    # from the gray colors of everything else. Setting cut_param = 1; has no
+    # effect, and setting 0 < cut_param < 1 can improve the plot. Experiment
+    # with it to find the best value.
+    cut_param = .012
+    colorvec[colorvec > cut_param] = cut_param
+    colorvec = colorvec / np.amax(colorvec)
+
+    # Gamma correction for optimal gray levels.Choosing gammacorr = 1; has no
+    # effect, and taking 0 < gammacorr = < 1 small will lighten up the dark
+    # shades. 
+    gammacorr = .7
+    colorvec = colorvec**(gammacorr)
+
+    # Construct grayscale color matrix by repeating the same color vector for
+    # red, green and blue channels.
+    # colormat = repmat(colorvec(:), 1, 3);
+    colormat = np.matlib.repmat(colorvec, 1, 3)
+
+    print()
 
 if __name__ == "__main__":
     main()
