@@ -389,9 +389,9 @@ def main():
     # each pixel belonging to a lamp in the virtual space causes a positive
     # element in Evec.
     Evec   = np.zeros(5*width,1)
-    indvec = repmat(logical(0),size(Evec));
-    indvec(n^2+[1:n^2]) = sqrt((Xmat(:,2)-.3).^2+Ymat(:,2).^2)<.3;
-    Evec(indvec) = 1;
+    indvec = repmat(logical(0),size(Evec))
+    indvec(n^2+[1:n^2]) = sqrt((Xmat(:,2)-.3).^2+Ymat(:,2).^2)<.3
+    Evec(indvec) = 1
     # Evec(n^2+round(n^2/2)-2) = 1;
     # Evec(3*n^2+round(n^2/2)-2) = 1;
 
