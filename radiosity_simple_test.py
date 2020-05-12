@@ -388,7 +388,7 @@ def main():
     # describes the contribution of emitted light in the scene. For example,
     # each pixel belonging to a lamp in the virtual space causes a positive
     # element in Evec.
-    Evec   = np.zeros(5*width,1);
+    Evec   = np.zeros(5*width,1)
     indvec = repmat(logical(0),size(Evec));
     indvec(n^2+[1:n^2]) = sqrt((Xmat(:,2)-.3).^2+Ymat(:,2).^2)<.3;
     Evec(indvec) = 1;
