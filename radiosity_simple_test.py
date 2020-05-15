@@ -1,10 +1,25 @@
 import numpy as np
 import numexpr as ne
 import numpy.matlib
-import matplotlib.pylab as plt
+
+import matplotlib
+matplotlib.use('Qt5Agg')
 from scipy.linalg import norm
 import time
+from matplotlib import cm
+from matplotlib.ticker import LinearLocator, FormatStrFormatter
+import matplotlib.colors as colors
+
 # from numba import jit
+
+from mayavi import mlab
+# mlab.options.backend = 'envisage'
+import pyvista as pv
+
+from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+import matplotlib.pyplot as plt
+# plt.ion()
 
 # @jit(nopython=True)
 def main():
@@ -15,6 +30,9 @@ def main():
     # gradient of gray values.
     #
     # Theodore Tsesmelis May 2020
+
+    # plotter = pv.BackgroundPlotter()
+    # plotter.add_mesh(pv.Cone())
 
     pi = np.pi
 
@@ -425,6 +443,112 @@ def main():
     # red, green and blue channels.
     # colormat = repmat(colorvec(:), 1, 3);
     colormat = np.matlib.repmat(colorvec, 1, 3)
+
+    # initialize plot
+    fig = plt.figure()
+    # ax = fig.gca(projection='3d')
+    ax = Axes3D(fig)
+
+    # The back wall
+    X = np.array([Xmat[0:width, 0] + d / 2, Xmat[0:width, 0] + d / 2, Xmat[0:width, 0] - d / 2, Xmat[0:width, 0] - d / 2])
+    Y = np.array([Ymat[0:width, 0], Ymat[0:width, 0], Ymat[0:width, 0], Ymat[0:width, 0]])
+    Z = np.array([Zmat[0:width, 0] - d / 2, Zmat[0:width, 0] + d / 2, Zmat[0:width, 0] + d / 2, Zmat[0:width, 0] - d / 2])
+
+    # pv.rcParams["use_panel"] = False
+    plotter = pv.BackgroundPlotter()
+    # plotter.add_mesh([X, Y, Z])
+    # plotter.add_mesh([np.stack([X, Y, Z], axis=1)])
+
+    # mlab.mesh(X, Y, Z, color=(colormat[0,0],colormat[0,1],colormat[0,2]))
+
+    # mesh = pv.StructuredGrid()
+    # verts = np.hstack([X.reshape(-1,1,order='F'), Y.reshape(-1,1,order='F'), Z.reshape(-1,1,order='F')])
+    # mesh.points = verts
+    # mesh.dimensions = [4, 1, 1]
+
+    # surf = pv.PolyData(verts[0:8,:])
+    #
+    # surf["My Labels"] = ["P{}".format(i) for i in range(surf.n_points)]
+    #
+    # plotter.add_mesh(surf)
+    # # plotter = pv.Plotter()
+    # plotter.add_point_labels(surf, "My Labels", font_size=86)
+    # plotter.show()
+
+    for i in range(width):
+        # verts = [np.stack([X[:, i], Y[:, i], Z[:, i]], axis=1)]
+        verts = np.hstack([X[:, i].reshape(-1, 1, order='F'), Y[:, i].reshape(-1, 1, order='F'), Z[:, i].reshape(-1, 1, order='F')])
+        # mlab.mesh(X[:, i], Y[:, i], Z[:, i])
+        # plotter.StructuredGrid(X[:, i], Y[:, i], Z[:, i])
+        # surf = pv.PolyData(verts)
+        surf = pv.StructuredGrid()
+        surf.points = np.array(verts)
+        surf.dimensions = [2, 1, 2]
+        plotter.add_mesh(surf, color=list(colormat[i,:]))
+        face = Poly3DCollection(verts)
+        face.set_color(colormat[i,:])
+        face.set_edgecolor(colormat[i,:])
+        ax.add_collection3d(face)
+
+    # for i in range(width):
+    #     mlab.mesh(X[:, i].reshape(1,-1), Y[:, i].reshape(1,-1), Z[:, i].reshape(1,-1))
+
+    # Roof
+    X = np.array([Xmat[0:width, 1] + d / 2, Xmat[0:width, 1] + d / 2, Xmat[0:width, 1] - d / 2, Xmat[0:width, 1] - d / 2])
+    Y = np.array([Ymat[0:width, 1] - d / 2, Ymat[0:width, 1] + d / 2, Ymat[0:width, 1] + d / 2, Ymat[0:width, 1] - d / 2])
+    Z = np.array([Zmat[0:width, 1], Zmat[0:width, 1], Zmat[0:width, 1], Zmat[0:width, 1]])
+
+    for i in range(width):
+        verts = [np.stack([X[:, i], Y[:, i], Z[:, i]], axis=1)]
+        face = Poly3DCollection(verts)
+        face.set_color(colormat[i+width,:])
+        face.set_edgecolor(colormat[i+width,:])
+        ax.add_collection3d(face)
+
+    # Floor
+    X = np.array([Xmat[0:width, 2] + d / 2, Xmat[0:width, 2] + d / 2, Xmat[0:width, 2] - d / 2, Xmat[0:width, 2] - d / 2])
+    Y = np.array([Ymat[0:width, 2] - d / 2, Ymat[0:width, 2] + d / 2, Ymat[0:width, 2] + d / 2, Ymat[0:width, 2] - d / 2])
+    Z = np.array([Zmat[0:width, 2], Zmat[0:width, 2], Zmat[0:width, 2], Zmat[0:width, 2]])
+
+    for i in range(width):
+        verts = [np.stack([X[:, i], Y[:, i], Z[:, i]], axis=1)]
+        face = Poly3DCollection(verts)
+        face.set_color(colormat[i + 2*width, :])
+        face.set_edgecolor(colormat[i + 2*width, :])
+        ax.add_collection3d(face)
+
+    # Right-hand-side wall
+    X = np.array([Xmat[0:width, 3], Xmat[0:width, 3], Xmat[0:width, 3], Xmat[0:width, 3]])
+    Y = np.array([Ymat[0:width, 3] + d / 2, Ymat[0:width, 3] + d / 2, Ymat[0:width, 3] - d / 2, Ymat[0:width, 3] - d / 2])
+    Z = np.array([Zmat[0:width, 3] - d / 2, Zmat[0:width, 3] + d / 2, Zmat[0:width, 3] + d / 2, Zmat[0:width, 3] - d / 2])
+
+    for i in range(width):
+        verts = [np.stack([X[:, i], Y[:, i], Z[:, i]], axis=1)]
+        face = Poly3DCollection(verts)
+        face.set_color(colormat[i + 3 * width, :])
+        face.set_edgecolor(colormat[i + 3 * width, :])
+        ax.add_collection3d(face)
+
+    # Left-hand-side wall
+    X = np.array([Xmat[0:width, 4], Xmat[0:width, 4], Xmat[0:width, 4], Xmat[0:width, 4]])
+    Y = np.array([Ymat[0:width, 4] + d / 2, Ymat[0:width, 4] + d / 2, Ymat[0:width, 4] - d / 2, Ymat[0:width, 4] - d / 2])
+    Z = np.array([Zmat[0:width, 4] - d / 2, Zmat[0:width, 4] + d / 2, Zmat[0:width, 4] + d / 2, Zmat[0:width, 4] - d / 2])
+
+    for i in range(width):
+        verts = [np.stack([X[:, i], Y[:, i], Z[:, i]], axis=1)]
+        face = Poly3DCollection(verts)
+        face.set_color(colormat[i + 4 * width, :])
+        face.set_edgecolor(colormat[i + 4 * width, :])
+        ax.add_collection3d(face)
+
+    ax.set_xlabel('X Label')
+    ax.set_ylabel('Y Label')
+    ax.set_zlabel('Z Label')
+    ax.set_xlim(-2, 2)
+    ax.set_ylim(-2, 2)
+    ax.set_zlim(-2, 2)
+
+    plt.show()
 
     print()
 
