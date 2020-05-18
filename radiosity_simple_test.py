@@ -10,8 +10,6 @@ from matplotlib import cm
 from matplotlib.ticker import LinearLocator, FormatStrFormatter
 import matplotlib.colors as colors
 
-# from numba import jit
-
 from mayavi import mlab
 # mlab.options.backend = 'envisage'
 import pyvista as pv
@@ -19,7 +17,8 @@ import pyvista as pv
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import matplotlib.pyplot as plt
-# plt.ion()
+
+import vtkplotter as vp
 
 # @jit(nopython=True)
 def main():
@@ -449,42 +448,33 @@ def main():
     # ax = fig.gca(projection='3d')
     ax = Axes3D(fig)
 
+    # plot = vp.Plotter()
+    plotter = pv.BackgroundPlotter()
+
     # The back wall
     X = np.array([Xmat[0:width, 0] + d / 2, Xmat[0:width, 0] + d / 2, Xmat[0:width, 0] - d / 2, Xmat[0:width, 0] - d / 2])
     Y = np.array([Ymat[0:width, 0], Ymat[0:width, 0], Ymat[0:width, 0], Ymat[0:width, 0]])
     Z = np.array([Zmat[0:width, 0] - d / 2, Zmat[0:width, 0] + d / 2, Zmat[0:width, 0] + d / 2, Zmat[0:width, 0] - d / 2])
 
-    # pv.rcParams["use_panel"] = False
-    plotter = pv.BackgroundPlotter()
-    # plotter.add_mesh([X, Y, Z])
-    # plotter.add_mesh([np.stack([X, Y, Z], axis=1)])
+    verts = np.hstack([X.reshape(-1,1,order='F'), Y.reshape(-1,1,order='F'), Z.reshape(-1,1,order='F')])
 
-    # mlab.mesh(X, Y, Z, color=(colormat[0,0],colormat[0,1],colormat[0,2]))
+    faces = np.arange(0, len(verts), 1)
+    faces = np.split(faces, width)
+    faces = np.insert(faces, 0, 4, axis=1)
 
-    # mesh = pv.StructuredGrid()
-    # verts = np.hstack([X.reshape(-1,1,order='F'), Y.reshape(-1,1,order='F'), Z.reshape(-1,1,order='F')])
-    # mesh.points = verts
-    # mesh.dimensions = [4, 1, 1]
+    mesh = pv.PolyData(verts, faces)
+    mesh["colors"] = colormat[0:width,:]
+    plotter.add_mesh(mesh, show_edges=False, scalars="colors", rgb=True)
+    # back_wall = vp.Mesh([verts, faces]).cellIndividualColors(colormat[0:width,:])
+    # # m.rotateZ(10).rotateX(20)  # just to make the axes visible
+    # # m.show(axes=8, elevation=60, bg='wheat', bg2='lightblue')
+    # # vp.show(m)
+    # plot.show(back_wall, interactive=True)
 
-    # surf = pv.PolyData(verts[0:8,:])
-    #
-    # surf["My Labels"] = ["P{}".format(i) for i in range(surf.n_points)]
-    #
-    # plotter.add_mesh(surf)
-    # # plotter = pv.Plotter()
-    # plotter.add_point_labels(surf, "My Labels", font_size=86)
-    # plotter.show()
 
     for i in range(width):
-        # verts = [np.stack([X[:, i], Y[:, i], Z[:, i]], axis=1)]
-        verts = np.hstack([X[:, i].reshape(-1, 1, order='F'), Y[:, i].reshape(-1, 1, order='F'), Z[:, i].reshape(-1, 1, order='F')])
-        # mlab.mesh(X[:, i], Y[:, i], Z[:, i])
-        # plotter.StructuredGrid(X[:, i], Y[:, i], Z[:, i])
-        # surf = pv.PolyData(verts)
-        surf = pv.StructuredGrid()
-        surf.points = np.array(verts)
-        surf.dimensions = [2, 1, 2]
-        plotter.add_mesh(surf, color=list(colormat[i,:]))
+        verts = [np.stack([X[:, i], Y[:, i], Z[:, i]], axis=1)]
+        # verts = np.hstack([X[:, i].reshape(-1, 1, order='F'), Y[:, i].reshape(-1, 1, order='F'), Z[:, i].reshape(-1, 1, order='F')])
         face = Poly3DCollection(verts)
         face.set_color(colormat[i,:])
         face.set_edgecolor(colormat[i,:])
@@ -498,6 +488,23 @@ def main():
     Y = np.array([Ymat[0:width, 1] - d / 2, Ymat[0:width, 1] + d / 2, Ymat[0:width, 1] + d / 2, Ymat[0:width, 1] - d / 2])
     Z = np.array([Zmat[0:width, 1], Zmat[0:width, 1], Zmat[0:width, 1], Zmat[0:width, 1]])
 
+    verts = np.hstack([X.reshape(-1,1,order='F'), Y.reshape(-1,1,order='F'), Z.reshape(-1,1,order='F')])
+
+    faces = np.arange(0, len(verts), 1)
+    faces = np.split(faces, width)
+    faces = np.insert(faces, 0, 4, axis=1)
+
+    mesh = pv.PolyData(verts, faces)
+    mesh["colors"] = colormat[width:2*width,:]
+    plotter.add_mesh(mesh, show_edges=False, scalars="colors", rgb=True)
+
+    # faces = np.arange(0, len(verts), 1)
+    # faces = np.split(faces, width)
+    # roof = vp.Mesh([verts, faces]).cellIndividualColors(colormat[width:width+width,:])
+    # # m.rotateZ(10).rotateX(20)  # just to make the axes visible
+    # # m.show(axes=8, elevation=60, bg='wheat', bg2='lightblue')
+    # vp.show(back_wall, roof)
+
     for i in range(width):
         verts = [np.stack([X[:, i], Y[:, i], Z[:, i]], axis=1)]
         face = Poly3DCollection(verts)
@@ -509,6 +516,16 @@ def main():
     X = np.array([Xmat[0:width, 2] + d / 2, Xmat[0:width, 2] + d / 2, Xmat[0:width, 2] - d / 2, Xmat[0:width, 2] - d / 2])
     Y = np.array([Ymat[0:width, 2] - d / 2, Ymat[0:width, 2] + d / 2, Ymat[0:width, 2] + d / 2, Ymat[0:width, 2] - d / 2])
     Z = np.array([Zmat[0:width, 2], Zmat[0:width, 2], Zmat[0:width, 2], Zmat[0:width, 2]])
+
+    verts = np.hstack([X.reshape(-1,1,order='F'), Y.reshape(-1,1,order='F'), Z.reshape(-1,1,order='F')])
+
+    faces = np.arange(0, len(verts), 1)
+    faces = np.split(faces, width)
+    faces = np.insert(faces, 0, 4, axis=1)
+
+    mesh = pv.PolyData(verts, faces)
+    mesh["colors"] = colormat[2*width:3*width,:]
+    plotter.add_mesh(mesh, show_edges=False, scalars="colors", rgb=True)
 
     for i in range(width):
         verts = [np.stack([X[:, i], Y[:, i], Z[:, i]], axis=1)]
@@ -522,6 +539,16 @@ def main():
     Y = np.array([Ymat[0:width, 3] + d / 2, Ymat[0:width, 3] + d / 2, Ymat[0:width, 3] - d / 2, Ymat[0:width, 3] - d / 2])
     Z = np.array([Zmat[0:width, 3] - d / 2, Zmat[0:width, 3] + d / 2, Zmat[0:width, 3] + d / 2, Zmat[0:width, 3] - d / 2])
 
+    verts = np.hstack([X.reshape(-1,1,order='F'), Y.reshape(-1,1,order='F'), Z.reshape(-1,1,order='F')])
+
+    faces = np.arange(0, len(verts), 1)
+    faces = np.split(faces, width)
+    faces = np.insert(faces, 0, 4, axis=1)
+
+    mesh = pv.PolyData(verts, faces)
+    mesh["colors"] = colormat[3*width:4*width,:]
+    plotter.add_mesh(mesh, show_edges=False, scalars="colors", rgb=True)
+
     for i in range(width):
         verts = [np.stack([X[:, i], Y[:, i], Z[:, i]], axis=1)]
         face = Poly3DCollection(verts)
@@ -533,6 +560,16 @@ def main():
     X = np.array([Xmat[0:width, 4], Xmat[0:width, 4], Xmat[0:width, 4], Xmat[0:width, 4]])
     Y = np.array([Ymat[0:width, 4] + d / 2, Ymat[0:width, 4] + d / 2, Ymat[0:width, 4] - d / 2, Ymat[0:width, 4] - d / 2])
     Z = np.array([Zmat[0:width, 4] - d / 2, Zmat[0:width, 4] + d / 2, Zmat[0:width, 4] + d / 2, Zmat[0:width, 4] - d / 2])
+
+    verts = np.hstack([X.reshape(-1,1,order='F'), Y.reshape(-1,1,order='F'), Z.reshape(-1,1,order='F')])
+
+    faces = np.arange(0, len(verts), 1)
+    faces = np.split(faces, width)
+    faces = np.insert(faces, 0, 4, axis=1)
+
+    mesh = pv.PolyData(verts, faces)
+    mesh["colors"] = colormat[4*width:5*width,:]
+    plotter.add_mesh(mesh, show_edges=False, scalars="colors", rgb=True)
 
     for i in range(width):
         verts = [np.stack([X[:, i], Y[:, i], Z[:, i]], axis=1)]
