@@ -462,6 +462,8 @@ def main():
     faces = np.split(faces, width)
     faces = np.insert(faces, 0, 4, axis=1)
 
+    # mlab.mesh(verts[:,0], verts[:,1], verts[:,2], faces, color=colormat[0:width,:])
+
     mesh = pv.PolyData(verts, faces)
     mesh["colors"] = colormat[0:width,:]
     plotter.add_mesh(mesh, show_edges=False, scalars="colors", rgb=True)
