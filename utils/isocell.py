@@ -50,11 +50,18 @@ class Isocell(object):
         self.__isrand = isrand
         self.__isdraw = draw_cells
 
+        # initialize area of cells
         self.A0 = []
+
+        # initialize cell center points, from where rays are passing
         self.Xr = []
         self.Yr = []
+        self.Zr = []
+
+        # initialize cell perimeter points
         self.Xc = []
         self.Yc = []
+        self.Zc = []
 
         self.__isocell_distribution()
 
@@ -85,7 +92,7 @@ class Isocell(object):
             uu = np.linspace(0,nu, nu+1).reshape(-1,1)
             uu = uu / nu
 
-        for i in range(1,n):
+        for i in range(1,n+1):
             R = i * dR
             nc = self.__N0 * (2 * i - 1)
             dth = 2 * np.pi / nc
@@ -134,8 +141,12 @@ class Isocell(object):
                     Yc = np.hstack([Yc, np.nan, yy])
 
         self.A0 = A0
+
         self.Xr = Xr
         self.Yr = Yr
+        self.Zc = np.sqrt(1-Xr**2 - Yr**2)
+
         self.Xc = Xc
         self.Yc = Yc
+        self.Zc = np.sqrt(1-Xc**2 - Yc**2)
 
