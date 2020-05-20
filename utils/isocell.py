@@ -140,13 +140,21 @@ class Isocell(object):
                     Xc = np.hstack([Xc, np.nan, xx])
                     Yc = np.hstack([Yc, np.nan, yy])
 
+        # remove nan values
+        Xc = Xc[~np.isnan(Xc)]
+        Yc = Yc[~np.isnan(Yc)]
+
+        # set output values
         self.A0 = A0
 
         self.Xr = Xr
         self.Yr = Yr
-        self.Zc = np.sqrt(1-Xr**2 - Yr**2)
+        self.Zr = np.real(np.sqrt(1 - Xr.astype(np.complex) ** 2 - Yr.astype(np.complex) ** 2)) # python does not automatically understands the feature of the numbers so we need to
+                                                                                                # manually adjust the types for the computation to np.float64
+                                                                                                # (e.g. np.sqrt(1 - Xr.astype(np.complex) ** 2 - Yr.astype(np.complex) ** 2).astype(np.float64)
+                                                                                                # or get the real() part of the complex numbers
 
         self.Xc = Xc
         self.Yc = Yc
-        self.Zc = np.sqrt(1-Xc**2 - Yc**2)
+        self.Zc = np.real(np.sqrt(1 - Xc.astype(np.complex) ** 2 - Yc.astype(np.complex) ** 2))
 
