@@ -12,6 +12,8 @@ from utils import Isocell
 def test():
     isocell = Isocell(rays=1000, div=5, isrand=0, draw_cells=True)
 
+    fdsfd
+
     print('testing!!!!')
 
     # print(isocell.XYr)
