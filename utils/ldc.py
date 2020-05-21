@@ -1,12 +1,17 @@
 import numpy as np
+import math
+
+import matplotlib
+import matplotlib.pyplot as plt
+matplotlib.use('Qt5Agg')
 
 class LightDistributionCurve(object):
     """docstring for Isocell"""
     #TODO: Modify and update this accordingly
 
-    def __init__(self, ldc=None):
+    def __init__(self, ldc=np.array([])):
 
-        if ldc:
+        if ldc.any():
             self.ldc = ldc
         else:
             # Use ldc sample
@@ -47,3 +52,25 @@ class LightDistributionCurve(object):
                                           [0,         0,         0,         0,         0,         0,         0],
                                           [0,         0,         0,         0,         0,         0,         0],
                                           [0,         0,         0,         0,         0,         0,         0]])
+
+    def plot2D(self, color='red', legend='LDC', inline=True):
+
+        step = np.ceil(180/self.ldc.shape[0])
+        middle_index = int(np.ceil(self.ldc.shape[1] // 2))
+        # self.ldc[:, self.ldc.shape[1] // 2]
+        theta = np.arange(0, 180+1, step)
+
+        ax = plt.subplot(111, projection='polar')
+        ax.plot(np.radians(theta), self.ldc[:,middle_index], color=color, label=legend)
+        ax.plot(np.radians(-theta), self.ldc[:, middle_index], color=color)
+        ax.set_theta_zero_location("S")
+        ax.set_rlabel_position(0)
+        # fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
+        ax.set_xticks(np.pi / 180. * np.linspace(180, -180, 8, endpoint=False))
+        ax.set_xticklabels(list(abs(np.linspace(180, -180, 8, endpoint=False))))
+        ax.set_thetalim(-np.pi, np.pi)
+
+        plt.legend()
+        if inline:
+            plt.show()
+
