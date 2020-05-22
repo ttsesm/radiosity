@@ -12,7 +12,7 @@ from mayavi import mlab
 
 def test_ldc():
     ldc = LightDistributionCurve()
-    ldc.plot2D(inline=False)
+    ldc.plot2D(inline=False, type='normalized')
 
     curve = np.array([[1.,       1.,      1.,     1.,      1.,      1.,      1.,      1.,      1.,      1.],
            [0.984,   0.984,   0.984,   0.984,   0.984,   0.984,   0.984,   0.984,   0.984,   0.984],

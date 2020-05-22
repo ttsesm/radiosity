@@ -1,5 +1,6 @@
 import numpy as np
-import math
+import sys
+from scipy.spatial.transform import Rotation as R
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -10,12 +11,13 @@ class LightDistributionCurve(object):
     #TODO: Modify and update this accordingly
 
     def __init__(self, ldc=np.array([])):
+        self.properties = {}
 
         if ldc.any():
-            self.ldc = ldc
+            self.properties['ldc'] = ldc
         else:
             # Use ldc sample
-            self.ldc = np.array([  [426.0060,  426.0060,  426.0060,  426.0060,  426.0060,  426.0060,  426.0060],
+            self.properties['ldc'] = np.array([  [426.0060,  426.0060,  426.0060,  426.0060,  426.0060,  426.0060,  426.0060],
                                    [424.7540,  425.0980,  425.5810,  425.9940,  425.6490,  425.1670,  424.7540],
                                    [421.8600,  422.2040,  422.7550,  423.1690,  422.6860,  422.2040,  421.8600],
                                    [415.5200,  416.0020,  416.1400,  416.8980,  416.6910,  416.2780,  415.7960],
@@ -53,16 +55,45 @@ class LightDistributionCurve(object):
                                           [0,         0,         0,         0,         0,         0,         0],
                                           [0,         0,         0,         0,         0,         0,         0]])
 
-    def plot2D(self, color='red', legend='LDC', inline=True):
 
-        step = np.ceil(180/self.ldc.shape[0])
-        middle_index = int(np.ceil(self.ldc.shape[1] // 2))
+        self.properties['normalized_ldc'] = self.__normalize_ldc(self.properties['ldc'])
+        # self.normalized_ldc = self.__normalize_ldc()
+        # self.symmetric_ldc = np.pad(self.properties['ldc'], (0, self.propertis['ldc'].shape(1)), 'symmetric')
+        # self.properties['symmetric_ldc'] = np.pad(self.properties['ldc'], ((0,0), (0,self.properties['ldc'].shape[1])), 'symmetric')
+        self.properties['symmetric_ldc'] = self.__get_symmetric_ldc(self.properties['ldc'], axis=1)
+        self.properties['normalized_symmetric_ldc'] = self.__normalize_ldc(self.properties['symmetric_ldc'])
+
+        self.plot3D()
+
+        print()
+
+    def plot2D(self, color='red', legend='LDC', inline=True, type='default'): # type could be normalized/symmetric or default
+
+        try:
+            if type not in ('default', 'normalized', 'symmetric'):
+                raise ValueError('\'{}\' is not a valid type.'.format(type))
+        except ValueError:
+            exit('\'{}\' is not a valid type.'.format(type))
+
+        if type == 'normalized':
+            # ldc = self.normalized_ldc
+            ldc = self.properties['normalized_ldc']
+        elif type == 'symmetric':
+            # ldc = self.symmetric_ldc
+            ldc = self.properties['symmetric_ldc']
+        else:
+            # ldc = self.ldc
+            ldc = self.properties['ldc']
+
+        # step = np.ceil(180/ldc.shape[0])
+        middle_index = int(np.ceil(ldc.shape[1] // 2))
         # self.ldc[:, self.ldc.shape[1] // 2]
-        theta = np.arange(0, 180+1, step)
+        # theta = np.arange(0, 180+1, step)
+        theta = np.linspace(0, 180, ldc.shape[0])
 
         ax = plt.subplot(111, projection='polar')
-        ax.plot(np.radians(theta), self.ldc[:,middle_index], color=color, label=legend)
-        ax.plot(np.radians(-theta), self.ldc[:, middle_index], color=color)
+        ax.plot(np.radians(theta), ldc[:,middle_index], color=color, label=legend)
+        ax.plot(np.radians(-theta), ldc[:, middle_index], color=color)
         ax.set_theta_zero_location("S")
         ax.set_rlabel_position(0)
         # fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
@@ -74,3 +105,63 @@ class LightDistributionCurve(object):
         if inline:
             plt.show()
 
+    def plot3D(self, pos=np.array([0, 0, 0]), rot=np.array([]), color='blue', legend='3D LDC', inline=True, type='default'): # type could be normalized/symmetric or default
+
+        try:
+            if type not in ('default', 'normalized', 'symmetric'):
+                raise ValueError('\'{}\' is not a valid type.'.format(type))
+        except ValueError:
+            exit('\'{}\' is not a valid type.'.format(type))
+
+        if type == 'normalized':
+            # ldc = self.normalized_ldc
+            ldc = self.properties['normalized_ldc']
+        elif type == 'symmetric':
+            # ldc = self.symmetric_ldc
+            ldc = self.properties['symmetric_ldc']
+        else:
+            # ldc = self.ldc
+            ldc = self.properties['ldc']
+
+        # ldc_planes = np.pad(self.properties['ldc'], ((0,self.properties['ldc'].shape[0]),(0,0)), 'symmetric')
+        # middle_index = int(np.ceil(ldc_planes.shape[0] // 2))
+        # ldc_planes = np.delete(ldc_planes, middle_index, 0)
+        ldc_planes = self.__get_symmetric_ldc(self.properties['ldc'])
+
+        # step = np.ceil(360 / ldc_planes.shape[0])
+        # angles around x-axis, need to turn by 90 degree right pol2cart output
+        # anglesX = np.arange(0, 360 + 1, step) / 180 * np.pi + np.pi / 2
+        anglesX = np.linspace(0, 360, ldc_planes.shape[0]) / 180 * np.pi + np.pi / 2
+
+        # angles around z-axis
+        anglesZ = np.linspace(0, 90, ldc_planes.shape[1])
+
+        print()
+
+
+    def __normalize_ldc(self, ldc, low_bound=0, upper_bound=1):
+        # Normalize to [0, 1] or any other bounds
+        m = np.amin(ldc)
+        range = np.amax(ldc) - m
+        normalized_ldc = (ldc - m) / range
+
+        # Then scale to[x, y]
+        range2 = upper_bound - low_bound
+        normalized_ldc = (normalized_ldc * range2) + low_bound
+
+        return  normalized_ldc
+
+    def __get_symmetric_ldc(self, ldc, axis=0):
+
+        if axis == 0:
+            ldc = np.pad(ldc, ((0, ldc.shape[axis]), (0, 0)), 'symmetric')
+            # middle_index = int(np.ceil(ldc.shape[0] // 2))
+            # ldc = np.delete(ldc, middle_index, 0)
+        else:
+            ldc = np.pad(ldc, ((0, 0), (0, ldc.shape[axis])), 'symmetric')
+            # middle_index = int(np.ceil(ldc.shape[1] // 2))
+
+        middle_index = int(np.ceil(ldc.shape[axis] // 2))
+        ldc = np.delete(ldc, middle_index, axis)
+
+        return ldc
