@@ -24,14 +24,21 @@
 #     plotter.add_mesh(poly, color="red", point_size=1)
 #     plotter.add_mesh(cell, color="blue", point_size=1)
 #
+#     test = pv.BackgroundPlotter()
+#     mesh = pv.Sphere()
+#     test.add_mesh(mesh)
+#
 #
 #     print('End testing the isocell module!!!!')
+#     plotter.app.exec_()
 #
 #
 #
 # if __name__ == '__main__':
 #     print('Testing the Isocell module!!!!')
 #     test_isocell()
+#     print('End!!!!')
+
 
 import time
 
@@ -41,11 +48,16 @@ mesh = pyvista.Sphere()
 plotter.add_mesh(mesh)
 plotter.show()
 
-# demonstrate non-blocking events
-for i in range(100):
-    mesh.points *= 1.01
-    plotter.render()
-    plotter.app.processEvents()
+plotter.app.exec_()
 
-plotter.add_text('sleeping...')
-time.sleep(3)  # demonstrate blocking event
+print('heloo')
+print("hello2")
+
+# # demonstrate non-blocking events
+# for i in range(100):
+#     mesh.points *= 1.01
+#     plotter.render()
+#     plotter.app.processEvents()
+#
+# plotter.add_text('sleeping...')
+# time.sleep(3)  # demonstrate blocking event
