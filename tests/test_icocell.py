@@ -39,25 +39,54 @@
 #     test_isocell()
 #     print('End!!!!')
 
+#
+# import time
+#
+# import pyvista
+# plotter = pyvista.BackgroundPlotter()
+# mesh = pyvista.Sphere()
+# plotter.add_mesh(mesh)
+# plotter.show()
+#
+# plotter.app.exec_()
+#
+# print('heloo')
+# print("hello2")
+#
+# # # demonstrate non-blocking events
+# # for i in range(100):
+# #     mesh.points *= 1.01
+# #     plotter.render()
+# #     plotter.app.processEvents()
+# #
+# # plotter.add_text('sleeping...')
+# # time.sleep(3)  # demonstrate blocking event
+
 
 import time
-
+import multiprocessing
+import os
+import sys
 import pyvista
-plotter = pyvista.BackgroundPlotter()
-mesh = pyvista.Sphere()
-plotter.add_mesh(mesh)
-plotter.show()
 
-plotter.app.exec_()
+def plot_mesh(data):
+    # from matplotlib.pyplot import plot, draw, show
+    print("entered plotting process")
+    # plot(data)
+    # show() # this will block and remain a viable process as long as the figure window is open
+    plotter = pyvista.BackgroundPlotter()
+    mesh = pyvista.Sphere()
+    plotter.add_mesh(mesh)
+    plotter.show()
+    plotter.app.exec_()
+    print("exiting plotting process")
 
-print('heloo')
-print("hello2")
-
-# # demonstrate non-blocking events
-# for i in range(100):
-#     mesh.points *= 1.01
-#     plotter.render()
-#     plotter.app.processEvents()
-#
-# plotter.add_text('sleeping...')
-# time.sleep(3)  # demonstrate blocking event
+if __name__ == "__main__":
+    print("starting __main__")
+    proc = multiprocessing.Process(target=plot_mesh, args=([],))
+    proc.daemon = False
+    proc.start()
+    time.sleep(1)
+    print("exiting main")
+    os._exit(0) # this exits immediately with no cleanup or buffer flushing
+    # sys.exit()  # this exits the main process
