@@ -69,12 +69,13 @@ import os
 import sys
 import pyvista
 
-def plot_mesh(data):
+def plot_mesh():
     # from matplotlib.pyplot import plot, draw, show
     print("entered plotting process")
     # plot(data)
     # show() # this will block and remain a viable process as long as the figure window is open
     plotter = pyvista.BackgroundPlotter()
+    # plotter = pyvista.Plotter()
     mesh = pyvista.Sphere()
     plotter.add_mesh(mesh)
     plotter.show()
@@ -83,7 +84,7 @@ def plot_mesh(data):
 
 if __name__ == "__main__":
     print("starting __main__")
-    proc = multiprocessing.Process(target=plot_mesh, args=([],))
+    proc = multiprocessing.Process(target=plot_mesh, args=())
     proc.daemon = False
     proc.start()
     time.sleep(1)
