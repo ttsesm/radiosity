@@ -136,6 +136,12 @@ class LightDistributionCurve(object):
         # angles around z-axis
         anglesZ = np.linspace(0, 90, ldc_planes.shape[1])
 
+        p1, p2 = self.pol2cart(anglesX.reshape(-1,1), ldc_planes)
+
+        X = np.ones(np.size(p1)) * pos[0];
+        Y = p1 + pos[1];
+        Z = p2 + pos[2];
+
         print()
 
 
@@ -165,3 +171,8 @@ class LightDistributionCurve(object):
         ldc = np.delete(ldc, middle_index, axis)
 
         return ldc
+
+    def pol2cart(self, theta, rho):
+        x = rho * np.cos(theta)
+        y = rho * np.sin(theta)
+        return x, y
