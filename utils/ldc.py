@@ -1,6 +1,12 @@
 import numpy as np
 import sys
+import os
+import multiprocessing
 from scipy.spatial.transform import Rotation as R
+
+import copy
+
+import pyvista as pv
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -64,6 +70,10 @@ class LightDistributionCurve(object):
         self.properties['normalized_symmetric_ldc'] = self.__normalize_ldc(self.properties['symmetric_ldc'])
 
         self.plot3D()
+
+        print()
+
+    def __plot2D(self, ldc):
 
         print()
 
@@ -138,9 +148,59 @@ class LightDistributionCurve(object):
 
         p1, p2 = self.pol2cart(anglesX.reshape(-1,1), ldc_planes)
 
-        X = np.ones(np.size(p1)) * pos[0];
+        X = np.ones(np.shape(p1)) * pos[0];
         Y = p1 + pos[1];
         Z = p2 + pos[2];
+
+        # points = np.column_stack([X.flatten(order='F'), Y.flatten(order='F'), Z.flatten(order='F')])
+        # poly = pv.PolyData(points)
+        # poly.rotate_x()
+        #
+        plotter = pv.BackgroundPlotter()
+        # # plotter = pv.Plotter()
+        # plotter.add_mesh(poly, color="b", point_size=1)
+        # lines = pv.lines_from_points(points)
+        # lines.rotate_x()
+        # plotter.add_mesh(lines, color="r")
+        # plotter.add_axes()
+        # plotter.show()
+
+        for i in range(ldc_planes.shape[1]):
+            points = np.column_stack([X[:,i], Y[:,i], Z[:,i]])
+            poly = pv.PolyData(copy.deepcopy(points))
+            poly.rotate_z(anglesZ[i])
+            plotter.add_mesh(poly, color="b", point_size=2)
+
+            # lines = pv.lines_from_points(poly.points)
+            # # lines.rotate_z(anglesZ[i])
+            # plotter.add_mesh(lines, color="r")
+
+            poly2 = pv.PolyData(copy.deepcopy(points))
+            poly2.rotate_z(-anglesZ[i])
+            plotter.add_mesh(poly2, color="r", point_size=2)
+            # lines = pv.lines_from_points(poly.points)
+            # # lines.rotate_z(180+anglesZ[i])
+            # plotter.add_mesh(lines, color="r")
+
+        # for i in range(ldc_planes.shape[1]):
+        #     points = np.column_stack([X[:,i], Y[:,i], Z[:,i]])
+        #     # poly = pv.PolyData(points)
+        #     # poly.rotate_z(anglesZ[i])
+        #     # plotter.add_mesh(poly, color="b", point_size=3)
+        #     #
+        #     # # lines = pv.lines_from_points(poly.points)
+        #     # # # lines.rotate_z(anglesZ[i])
+        #     # # plotter.add_mesh(lines, color="r")
+        #
+        #     poly = pv.PolyData(points)
+        #     poly.rotate_z(-anglesZ[i])
+        #     plotter.add_mesh(poly, color="r", point_size=2)
+        #     # lines = pv.lines_from_points(poly.points)
+        #     # # lines.rotate_z(180+anglesZ[i])
+        #     # plotter.add_mesh(lines, color="r")
+
+        plotter.add_axes()
+        plotter.show()
 
         print()
 
