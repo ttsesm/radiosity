@@ -70,6 +70,7 @@ import sys
 import pyvista
 
 def plot_mesh():
+
     # from matplotlib.pyplot import plot, draw, show
     print("entered plotting process")
     # plot(data)
@@ -82,12 +83,15 @@ def plot_mesh():
     plotter.app.exec_()
     print("exiting plotting process")
 
+
 if __name__ == "__main__":
     print("starting __main__")
+
     proc = multiprocessing.Process(target=plot_mesh, args=())
     proc.daemon = False
     proc.start()
     time.sleep(1)
+
     print("exiting main")
     os._exit(0) # this exits immediately with no cleanup or buffer flushing
     # sys.exit()  # this exits the main process
