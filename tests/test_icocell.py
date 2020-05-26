@@ -1,8 +1,9 @@
 # import numpy as np
 # from utils import Isocell
 #
-# import matplotlib
-# matplotlib.use('Qt5Agg')
+import matplotlib
+import matplotlib.pyplot as plt
+matplotlib.use('Qt5Agg')
 #
 # import pyvista as pv
 # from mayavi import mlab
@@ -68,6 +69,7 @@ import multiprocessing
 import os
 import sys
 import pyvista
+import numpy as np
 
 def plot_mesh():
 
@@ -83,14 +85,39 @@ def plot_mesh():
     plotter.app.exec_()
     print("exiting plotting process")
 
+def plot_graph(data, color, holdOn):
+
+    print("entered plotting process")
+    ax = plt.subplot(111, projection='polar')
+    ax.plot(data[0], data[1], color=color)
+    ax.set_rmax(2)
+    ax.set_rticks([0.5, 1, 1.5, 2])  # Less radial ticks
+    ax.set_rlabel_position(-22.5)  # Move radial labels away from plotted line
+    ax.grid(True)
+
+    ax.set_title("A line plot on a polar axis", va='bottom')
+
+    if not holdOn:
+        print("Not on hold!!!")
+        plt.show() # this will block and remain a viable process as long as the figure window is open
+    print("exiting plotting process")
+
 
 if __name__ == "__main__":
     print("starting __main__")
 
-    proc = multiprocessing.Process(target=plot_mesh, args=())
+    # fig = plt.figure()
+    # fig = plt.subplot(111, projection='polar')
+    r = np.arange(0, 2, 0.01)
+    theta = 2 * np.pi * r
+    # fig.plot(theta, r, color='red')
+    # proc = multiprocessing.Process(target=plot_mesh, args=())
+    proc = multiprocessing.Process(target=plot_graph, args=([theta, r], 'red', False,))
     proc.daemon = False
     proc.start()
     time.sleep(1)
+
+    # plt.show()
 
     print("exiting main")
     os._exit(0) # this exits immediately with no cleanup or buffer flushing
