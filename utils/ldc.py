@@ -2,6 +2,7 @@ import numpy as np
 import sys
 import os
 import multiprocessing
+import time
 from scipy.spatial.transform import Rotation as R
 
 import copy
@@ -69,13 +70,31 @@ class LightDistributionCurve(object):
         self.properties['symmetric_ldc'] = self.__get_symmetric_ldc(self.properties['ldc'], axis=1)
         self.properties['normalized_symmetric_ldc'] = self.__normalize_ldc(self.properties['symmetric_ldc'])
 
-        self.plot3D()
+        # self.plot3D()
 
         print()
 
-    def __plot2D(self, ldc):
-
-        print()
+    # def __plot2D(self, ldc, color, legend, inline, type):
+    #
+    #     # step = np.ceil(180/ldc.shape[0])
+    #     middle_index = int(np.ceil(ldc.shape[1] // 2))
+    #     # self.ldc[:, self.ldc.shape[1] // 2]
+    #     # theta = np.arange(0, 180+1, step)
+    #     theta = np.linspace(0, 180, ldc.shape[0])
+    #
+    #     ax = plt.subplot(111, projection='polar')
+    #     ax.plot(np.radians(theta), ldc[:,middle_index], color=color, label=legend)
+    #     ax.plot(np.radians(-theta), ldc[:, middle_index], color=color)
+    #     ax.set_theta_zero_location("S")
+    #     ax.set_rlabel_position(0)
+    #     # fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
+    #     ax.set_xticks(np.pi / 180. * np.linspace(180, -180, 8, endpoint=False))
+    #     ax.set_xticklabels(list(abs(np.linspace(180, -180, 8, endpoint=False))))
+    #     ax.set_thetalim(-np.pi, np.pi)
+    #
+    #     plt.legend()
+    #     if inline:
+    #         plt.show()
 
     def plot2D(self, color='red', legend='LDC', inline=True, type='default'): # type could be normalized/symmetric or default
 
@@ -94,6 +113,11 @@ class LightDistributionCurve(object):
         else:
             # ldc = self.ldc
             ldc = self.properties['ldc']
+
+        # proc = multiprocessing.Process(target=self.__plot2D(ldc, color, legend, inline, type), args=())
+        # proc.daemon = False
+        # proc.start()
+        # # time.sleep(1)
 
         # step = np.ceil(180/ldc.shape[0])
         middle_index = int(np.ceil(ldc.shape[1] // 2))
@@ -115,10 +139,10 @@ class LightDistributionCurve(object):
         if inline:
             plt.show()
 
-    def plot3D(self, pos=np.array([0, 0, 0]), rot=np.array([]), color='blue', legend='3D LDC', inline=True, type='default'): # type could be normalized/symmetric or default
+    def plot3D(self, pos=np.array([0, 0, 0]), rot=np.array([0, 0, 0, 0]), color='blue', legend='3D LDC', inline=True, type='default'): # type could be normalized or default
 
         try:
-            if type not in ('default', 'normalized', 'symmetric'):
+            if type not in ('default', 'normalized'):
                 raise ValueError('\'{}\' is not a valid type.'.format(type))
         except ValueError:
             exit('\'{}\' is not a valid type.'.format(type))
@@ -126,9 +150,9 @@ class LightDistributionCurve(object):
         if type == 'normalized':
             # ldc = self.normalized_ldc
             ldc = self.properties['normalized_ldc']
-        elif type == 'symmetric':
-            # ldc = self.symmetric_ldc
-            ldc = self.properties['symmetric_ldc']
+        # elif type == 'symmetric':
+        #     # ldc = self.symmetric_ldc
+        #     ldc = self.properties['symmetric_ldc']
         else:
             # ldc = self.ldc
             ldc = self.properties['ldc']
@@ -145,64 +169,84 @@ class LightDistributionCurve(object):
 
         # angles around z-axis
         anglesZ = np.linspace(0, 90, ldc_planes.shape[1])
+        anglesZ = np.repeat(anglesZ, ldc_planes.shape[0])
 
-        p1, p2 = self.pol2cart(anglesX.reshape(-1,1), ldc_planes)
+        p1, p2 = self.__pol2cart(anglesX.reshape(-1,1), ldc_planes)
 
         X = np.ones(np.shape(p1)) * pos[0];
         Y = p1 + pos[1];
         Z = p2 + pos[2];
 
-        # points = np.column_stack([X.flatten(order='F'), Y.flatten(order='F'), Z.flatten(order='F')])
-        # poly = pv.PolyData(points)
-        # poly.rotate_x()
+        points = np.column_stack([X.flatten(order='F'), Y.flatten(order='F'), Z.flatten(order='F')])
+        poly = pv.PolyData(copy.deepcopy(points))
+        poly.rotate_z(copy.deepcopy(anglesZ))
+        if rot[0]:
+            poly.rotate_x(rot[3])
+        elif rot[1]:
+            poly.rotate_y(rot[3])
+        elif rot[2]:
+            poly.rotate_z(rot[3])
+        lines = pv.lines_from_points(poly.points)
+
+        poly2 = pv.PolyData(copy.deepcopy(points))
+        poly2.rotate_z(-copy.deepcopy(anglesZ))
+        if rot[0]:
+            poly2.rotate_x(rot[3])
+        elif rot[1]:
+            poly2.rotate_y(rot[3])
+        elif rot[2]:
+            poly2.rotate_z(rot[3])
+        lines2 = pv.lines_from_points(poly2.points)
+
         #
         plotter = pv.BackgroundPlotter()
         # # plotter = pv.Plotter()
-        # plotter.add_mesh(poly, color="b", point_size=1)
-        # lines = pv.lines_from_points(points)
-        # lines.rotate_x()
-        # plotter.add_mesh(lines, color="r")
-        # plotter.add_axes()
-        # plotter.show()
-
-        for i in range(ldc_planes.shape[1]):
-            points = np.column_stack([X[:,i], Y[:,i], Z[:,i]])
-            poly = pv.PolyData(copy.deepcopy(points))
-            poly.rotate_z(anglesZ[i])
-            plotter.add_mesh(poly, color="b", point_size=2)
-
-            # lines = pv.lines_from_points(poly.points)
-            # # lines.rotate_z(anglesZ[i])
-            # plotter.add_mesh(lines, color="r")
-
-            poly2 = pv.PolyData(copy.deepcopy(points))
-            poly2.rotate_z(-anglesZ[i])
-            plotter.add_mesh(poly2, color="r", point_size=2)
-            # lines = pv.lines_from_points(poly.points)
-            # # lines.rotate_z(180+anglesZ[i])
-            # plotter.add_mesh(lines, color="r")
+        plotter.add_mesh(poly, color="r", point_size=2)
+        plotter.add_mesh(poly2, color="r", point_size=2)
+        plotter.add_mesh(lines, color="b")
+        plotter.add_mesh(lines2, color="b")
+        plotter.add_axes()
+        plotter.show()
+        plotter.app.exec_()
 
         # for i in range(ldc_planes.shape[1]):
         #     points = np.column_stack([X[:,i], Y[:,i], Z[:,i]])
-        #     # poly = pv.PolyData(points)
-        #     # poly.rotate_z(anglesZ[i])
-        #     # plotter.add_mesh(poly, color="b", point_size=3)
-        #     #
-        #     # # lines = pv.lines_from_points(poly.points)
-        #     # # # lines.rotate_z(anglesZ[i])
-        #     # # plotter.add_mesh(lines, color="r")
+        #     poly = pv.PolyData(copy.deepcopy(points))
+        #     poly.rotate_z(anglesZ[i])
+        #     plotter.add_mesh(poly, color="b", point_size=2)
         #
-        #     poly = pv.PolyData(points)
-        #     poly.rotate_z(-anglesZ[i])
-        #     plotter.add_mesh(poly, color="r", point_size=2)
+        #     # lines = pv.lines_from_points(poly.points)
+        #     # # lines.rotate_z(anglesZ[i])
+        #     # plotter.add_mesh(lines, color="r")
+        #
+        #     poly2 = pv.PolyData(copy.deepcopy(points))
+        #     poly2.rotate_z(-anglesZ[i])
+        #     plotter.add_mesh(poly2, color="r", point_size=2)
         #     # lines = pv.lines_from_points(poly.points)
         #     # # lines.rotate_z(180+anglesZ[i])
         #     # plotter.add_mesh(lines, color="r")
+        #
+        # # for i in range(ldc_planes.shape[1]):
+        # #     points = np.column_stack([X[:,i], Y[:,i], Z[:,i]])
+        # #     # poly = pv.PolyData(points)
+        # #     # poly.rotate_z(anglesZ[i])
+        # #     # plotter.add_mesh(poly, color="b", point_size=3)
+        # #     #
+        # #     # # lines = pv.lines_from_points(poly.points)
+        # #     # # # lines.rotate_z(anglesZ[i])
+        # #     # # plotter.add_mesh(lines, color="r")
+        # #
+        # #     poly = pv.PolyData(points)
+        # #     poly.rotate_z(-anglesZ[i])
+        # #     plotter.add_mesh(poly, color="r", point_size=2)
+        # #     # lines = pv.lines_from_points(poly.points)
+        # #     # # lines.rotate_z(180+anglesZ[i])
+        # #     # plotter.add_mesh(lines, color="r")
+        #
+        # plotter.add_axes()
+        # plotter.show()
 
-        plotter.add_axes()
-        plotter.show()
-
-        print()
+        # print()
 
 
     def __normalize_ldc(self, ldc, low_bound=0, upper_bound=1):
@@ -232,7 +276,7 @@ class LightDistributionCurve(object):
 
         return ldc
 
-    def pol2cart(self, theta, rho):
+    def __pol2cart(self, theta, rho):
         x = rho * np.cos(theta)
         y = rho * np.sin(theta)
         return x, y
