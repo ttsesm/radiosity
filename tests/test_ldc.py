@@ -7,25 +7,32 @@ import pyvista as pv
 import numpy as np
 
 from utils import LightDistributionCurve
+from utils import rotation as r
 
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.use('Qt5Agg')
 
-# from mayavi import mlab
+# def plotting_thread():
+#     ldc = LightDistributionCurve()
+#     ldc.plot2D(inline=True, type='normalized')
+#
+# def plotting_thread2():
+#     ldc = LightDistributionCurve()
+#     ldc.plot3D()
 
-def plotting_thread():
-    ldc = LightDistributionCurve()
-    ldc.plot2D(inline=True, type='normalized')
+def test_vvrotvec():
+    rot = r.vvrotvec([0, 0, 0], [0, 1, 0])
 
-def plotting_thread2():
-    ldc = LightDistributionCurve()
-    ldc.plot3D()
+    M = r.vrrotvec2mat(rot)
+
+    print(rot)
 
 
 def test_ldc():
+
     ldc = LightDistributionCurve()
-    ldc.plot2D(holdOn=True, type='normalized')
+    ldc.plot2D(holdOn=False, type='normalized')
     ldc.plot3D()
 
     curve = np.array([[1.,       1.,      1.,     1.,      1.,      1.,      1.,      1.,      1.,      1.],
@@ -73,6 +80,7 @@ if __name__ == '__main__':
     # proc2.start()
     # # time.sleep(1)
 
+    test_vvrotvec()
     test_ldc()
     print("exiting main")
     os._exit(0)  # this exits immediately with no cleanup or buffer flushing

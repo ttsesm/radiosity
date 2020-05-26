@@ -115,10 +115,11 @@ class LightDistributionCurve(object):
             ldc = self.properties['ldc']
 
         proc = multiprocessing.Process(target=self.__plot2D, args=(ldc, color, legend, holdOn,))
-        if holdOn:
-            proc.daemon = True
-        else:
-            proc.daemon = False
+        # if holdOn:
+        #     proc.daemon = True
+        # else:
+        #     proc.daemon = False
+        proc.daemon = False
         proc.start()
 
         time.sleep(1)
