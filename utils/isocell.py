@@ -63,6 +63,9 @@ class Isocell(object):
         self.Yc = []
         self.Zc = []
 
+        self.points = []
+        self.cell_points = []
+
         self.__isocell_distribution()
 
     def __isocell_distribution(self):
@@ -154,7 +157,9 @@ class Isocell(object):
                                                                                                 # (e.g. np.sqrt(1 - Xr.astype(np.complex) ** 2 - Yr.astype(np.complex) ** 2).astype(np.float64)
                                                                                                 # or get the real() part of the complex numbers
 
+        self.points = np.column_stack([self.Xr, self.Yr, self.Zr])
         self.Xc = Xc
         self.Yc = Yc
         self.Zc = np.real(np.sqrt(1 - Xc.astype(np.complex) ** 2 - Yc.astype(np.complex) ** 2))
+        self.cell_points = np.column_stack([self.Xc, self.Yc, self.Zc])
 
