@@ -1,6 +1,7 @@
 import numpy as np
 import multiprocessing
 from utils import Isocell
+from utils import LightDistributionCurve
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -12,6 +13,9 @@ from mayavi import mlab
 
 def test_isocell():
     isocell = Isocell(rays=1000, div=5, isrand=0, draw_cells=True)
+    ldc = LightDistributionCurve()
+
+    isocell.compute_weights(ldc.properties['symmetric_ldc'], np.array([[0, 0, 0], [1,1,1]]))
 
 
     points = isocell.points

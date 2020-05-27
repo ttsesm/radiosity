@@ -1,4 +1,5 @@
 import numpy as np
+from scipy import interpolate
 
 class Isocell(object):
     """docstring for Isocell"""
@@ -65,6 +66,8 @@ class Isocell(object):
 
         self.points = []
         self.cell_points = []
+
+        self.weights = []
 
         self.__isocell_distribution()
 
@@ -162,4 +165,53 @@ class Isocell(object):
         self.Yc = Yc
         self.Zc = np.real(np.sqrt(1 - Xc.astype(np.complex) ** 2 - Yc.astype(np.complex) ** 2))
         self.cell_points = np.column_stack([self.Xc, self.Yc, self.Zc])
+
+    def compute_weights(self, distribution, points):
+        n_vis = self.points.shape[0]
+        n_pis = points.shape[0]
+
+        anglesX = np.linspace(0, 180, distribution.shape[0])
+        anglesZ = np.linspace(0, 180, distribution.shape[1])
+
+        # Compute the relative position of each point in the isocell sphere with respect to the given point
+        v_points = (np.tile(self.points, (n_pis, 1)) - np.repeat(points[np.newaxis, :], n_vis, 1)).reshape(-1,3)
+
+        # Compute the distance between each point in the isocell sphere with respect to the given point
+        norms = np.sqrt(np.sum(v_points * v_points, axis=1))
+
+        # Compute the angle between the principal axis (Z-axis) and the ray connecting the light source to each point
+        v_centerZ = np.array([0, 0, 1])
+        vcenter_to_vpoint_angle_Z_axis = np.rad2deg(np.arccos(np.sum(np.repeat(v_centerZ[np.newaxis, :], n_vis*n_pis, 0) * v_points, axis=1) / norms))
+
+        # Compute the angle between the principal axis (X-axis) and the ray connecting the light source to each point
+        v_centerX = np.array([1, 0, 0])
+        vcenter_to_vpoint_angle_X_axis = np.rad2deg(np.arccos(np.sum(np.repeat(v_centerX[np.newaxis, :], n_vis*n_pis, 0) * v_points, axis=1) / norms))
+
+        interpolation = interpolate.interp2d(anglesX, anglesZ, distribution.T)
+
+        weights = np.diagonal(interpolation(vcenter_to_vpoint_angle_Z_axis, vcenter_to_vpoint_angle_X_axis)).reshape(-1,n_vis)
+
+        # for point in points:
+        #     # Compute the relative position of each point in the isocell sphere with respect to the given point
+        #     v_points = self.points - np.repeat(point[np.newaxis,:], n_vis, 0)
+        #
+        #     # Compute the distance between each point in the isocell sphere with respect to the given point
+        #     norms = np.sqrt(np.sum(v_points * v_points, axis=1))
+        #
+        #     # Compute the angle between the principal axis (Z-axis) and the ray connecting the light source to each point
+        #     v_centerZ = np.array([0, 0, 1])
+        #     vcenter_to_vpoint_angle_Z_axis = np.rad2deg(np.arccos(np.sum(np.repeat(v_centerZ[np.newaxis,:], n_vis, 0) * v_points, axis=1) / norms))
+        #
+        #     # Compute the angle between the principal axis (X-axis) and the ray connecting the light source to each point
+        #     v_centerX = np.array([1, 0, 0])
+        #     vcenter_to_vpoint_angle_X_axis = np.rad2deg(np.arccos(np.sum(np.repeat(v_centerX[np.newaxis,:], n_vis, 0) * v_points, axis=1) / norms))
+        #
+        #     interpolation = interpolate.interp2d(anglesX, anglesZ, distribution.T)
+        #
+        #     weights = np.diagonal(interpolation(vcenter_to_vpoint_angle_Z_axis, vcenter_to_vpoint_angle_X_axis))
+        #
+        #     # for i, j in zip(vcenter_to_vpoint_angle_Z_axis, vcenter_to_vpoint_angle_X_axis):
+        #     #     weights.append(interpolation(i, j))
+
+        self.weights = np.array(weights)
 
