@@ -167,6 +167,7 @@ class Isocell(object):
         self.cell_points = np.column_stack([self.Xc, self.Yc, self.Zc])
 
     def compute_weights(self, distribution, points):
+        ''' Compute weight for the isocell rays in correspondence to given origin points, which could be the center of patches for example.'''
         n_vis = self.points.shape[0]
         n_pis = points.shape[0]
 
