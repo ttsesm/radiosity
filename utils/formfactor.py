@@ -6,20 +6,49 @@ from multiprocessing import Pool
 import numpy as np
 from numpy.core.umath_tests import inner1d
 
+import open3d as o3d
+
+import vtk
+import pyvista as pv
+
 from utils.triangle import Triangle, vectorize, distance
+
+from utils import Isocell
 
 
 class FormFactor(object):
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
 
-        self.f # scene faces
-        self.v # scene vertices
+        if not args:
+            return
+        elif len(args) == 1:
+            if isinstance(args[0], pv.PolyData):
+                self.mesh = args[0]
+            else:
+                raise TypeError('Invalid input type')
 
-        self.F = []
+        # self.f # scene faces
+        # self.v # scene vertices
+
+        self.F = np.zeros(shape=(self.mesh.faces.size, self.mesh.faces.size),dtype='float32')
+
+        self.__n_rays = kwargs.pop('rays', 1000)
+        self.isocell = Isocell(rays=self.__n_rays, div=3, isrand=0, draw_cells=True)
+
+        # correct the number of rays created from the isocell casting
+        self.__n_rays = self.isocell.points.shape[0]
+
+        print()
 
     def calculate_form_factor(self, processes):
 
         return
+
+    def get_number_of_rays(self):
+        return self.__n_rays
+
+    def __set_number_of_rays(self, number_of_rays):
+        self.__n_rays = number_of_rays
 
 
 

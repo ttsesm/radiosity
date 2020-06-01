@@ -4,6 +4,7 @@ import copy
 import multiprocessing
 from utils import Isocell
 from utils import LightDistributionCurve
+from utils import FormFactor
 
 from scipy.io import loadmat
 
@@ -66,11 +67,25 @@ def test_formfactors():
     # # # plot_mesh(vertices, faces)
     # # plot_mesh(vertices, faces[np.vstack([floor_patches, wall_patches, desk_patches, leg_desk_patches, panel_patches, panel_handle_patches, light_patches]),:].reshape(-1,4))
 
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(np.asarray(vertices))
+    # # open3d + point cloud example
+    # pcd = o3d.geometry.PointCloud()
+    # pcd.points = o3d.utility.Vector3dVector(np.asarray(vertices))
+    #
+    # pcd.estimate_normals()
+    # o3d.visualization.draw_geometries([pcd])
 
-    pcd.estimate_normals()
-    o3d.visualization.draw_geometries([pcd])
+    # open3d + mesh example
+    # # mesh = o3d.geometry.TriangleMesh(vertices=np.asarray(vertices), faces=faces)
+    # mesh = o3d.geometry.TriangleMesh()
+    # mesh.vertices = o3d.utility.Vector3dVector(vertices)
+    # mesh.triangles = o3d.utility.Vector3iVector(faces)
+    # # mesh.triangles = o3d.utility.Vector3iVector(faces[np.vstack([floor_patches, wall_patches, desk_patches, leg_desk_patches, panel_patches, panel_handle_patches, light_patches]),:].reshape(-1,3))
+    # mesh.triangle_normals = o3d.utility.Vector3dVector(normals)
+    # o3d.visualization.draw_geometries([mesh])
+
+    mesh = pv.PolyData(vertices, faces)
+
+    ff = FormFactor(mesh)
 
     print('End testing the form factors module!!!!')
     # plt.show()

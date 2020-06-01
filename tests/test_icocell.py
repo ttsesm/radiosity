@@ -42,6 +42,7 @@ def test_isocell():
     plotter.add_mesh(cell, color="blue", point_size=1)
     plotter.add_axes()
     plotter.show()
+    plotter.app.exec_()
 
     print('End testing the isocell module!!!!')
     # plt.show()
