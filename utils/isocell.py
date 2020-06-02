@@ -98,6 +98,7 @@ class Isocell(object):
             uu = np.linspace(0,nu, nu+1).reshape(-1,1)
             uu = uu / nu
 
+        # TODO: possibly optimize this part with multiprocessing
         for i in range(1,n+1):
             R = i * dR
             nc = self.__N0 * (2 * i - 1)

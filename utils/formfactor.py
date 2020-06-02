@@ -1,7 +1,9 @@
 #!/usr/local/bin/python3
 # -*- coding: UTF-8 -*-
 
-from multiprocessing import Pool
+# from multiprocessing import Pool
+from multiprocessing.dummy import Pool as ThreadPool
+# from pathos.multiprocessing import ProcessingPool as Pool
 
 import numpy as np
 from numpy.core.umath_tests import inner1d
@@ -30,7 +32,12 @@ class FormFactor(object):
         # self.f # scene faces
         # self.v # scene vertices
 
-        self.F = np.zeros(shape=(self.mesh.faces.size, self.mesh.faces.size),dtype='float32')
+        self.__patch_count = self.mesh.faces.size
+        # self.__patch_count = 100
+
+        # self.ffs = np.zeros(shape=(self.mesh.faces.size, self.mesh.faces.size),dtype='float32')
+        self.ffs = np.ones(shape=(self.mesh.faces.size, self.mesh.faces.size),dtype='float32')
+        # self.ffs = np.ones(shape=(100,100),dtype='float32')
 
         self.__n_rays = kwargs.pop('rays', 1000)
         self.isocell = Isocell(rays=self.__n_rays, div=3, isrand=0, draw_cells=True)
@@ -40,9 +47,26 @@ class FormFactor(object):
 
         print()
 
-    def calculate_form_factor(self, processes):
+    def __calculate_one_patch_form_factor(self, i, p_1):
+        # print('[form factor] patch {}/{} ...'.format(i, self.__patch_count))
+        # create empty form factor array
+        # ff = np.ones(self.__patch_count)*i
+        self.ffs[i,:] *= i
 
-        return
+        # return ff
+
+    def calculate_form_factor(self, processes=4):
+        with ThreadPool(processes=processes) as pool:
+            # for i, num in enumerate(np.arange(1,10)):
+            #     print('[form factor] patch {}/{} ...'.format(i, self.__patch_count))
+            ffs = pool.starmap(self.__calculate_one_patch_form_factor, enumerate((self.mesh.faces)))
+            # ffs = pool.starmap(self.__calculate_one_patch_form_factor, enumerate(np.arange(0,100)))
+            # pool.starmap(self.__calculate_one_patch_form_factor, enumerate(np.arange(0,100)))
+
+        return np.array(self.ffs)
+
+    # def __call__(self, x):
+    #     return self.__calculate_one_patch_form_factor(x)
 
     def get_number_of_rays(self):
         return self.__n_rays

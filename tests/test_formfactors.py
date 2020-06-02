@@ -85,7 +85,9 @@ def test_formfactors():
 
     mesh = pv.PolyData(vertices, faces)
 
-    ff = FormFactor(mesh)
+    # ff = FormFactor(mesh)
+    # ffs = FormFactor(mesh).calculate_form_factor(processes=5)
+    ffs = FormFactor(mesh).calculate_form_factor(processes=multiprocessing.cpu_count() - 1)
 
     print('End testing the form factors module!!!!')
     # plt.show()
