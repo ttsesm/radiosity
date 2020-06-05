@@ -32,7 +32,7 @@ class FormFactor(object):
         # self.f # scene faces
         # self.v # scene vertices
 
-        self.__patch_count = self.mesh.faces.size
+        self.__patch_count = self.mesh.n_faces
         # self.__patch_count = 100
 
         # self.ffs = np.zeros(shape=(self.mesh.faces.size, self.mesh.faces.size),dtype='float32')
@@ -55,11 +55,14 @@ class FormFactor(object):
 
         # return ff
 
+    def __get_faces(self, faces, num_of_vertices=3):
+        return faces.reshape(-1,num_of_vertices+1)[:,1:num_of_vertices+1]
+
     def calculate_form_factor(self, processes=4):
         with ThreadPool(processes=processes) as pool:
             # for i, num in enumerate(np.arange(1,10)):
             #     print('[form factor] patch {}/{} ...'.format(i, self.__patch_count))
-            ffs = pool.starmap(self.__calculate_one_patch_form_factor, enumerate((self.mesh.faces)))
+            ffs = pool.starmap(self.__calculate_one_patch_form_factor, enumerate((self.__get_faces(self.mesh.faces))))
             # ffs = pool.starmap(self.__calculate_one_patch_form_factor, enumerate(np.arange(0,100)))
             # pool.starmap(self.__calculate_one_patch_form_factor, enumerate(np.arange(0,100)))
 
