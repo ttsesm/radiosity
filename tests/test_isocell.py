@@ -25,14 +25,18 @@ from mayavi import mlab
 #
 #     return points, ind
 
-def example_func(a,b):
-   return a+b
-
 def test_isocell_ray_casting():
     # Create source to ray trace
     sphere = pv.Sphere(radius=0.85)
 
-    faces = pv.convert_array(sphere.GetFaces())
+    p1 = vp.Plotter()
+    p2 = vp.Plotter()
+    test_sphere = vp.Sphere()
+    p1.show(test_sphere, axes=1)
+    p2.show(test_sphere, axes=1)
+    vp.show(1, pv.Cube(), axes=1)
+
+    # faces = pv.convert_array(sphere.GetFaces())
 
     # Create isocell rays
     isocell = Isocell(rays=1000, div=5, isrand=0, draw_cells=True)
