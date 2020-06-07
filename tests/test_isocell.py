@@ -11,32 +11,18 @@ matplotlib.use('Qt5Agg')
 
 import pyvista as pv
 import vtkplotter as vp
-from mayavi import mlab
+# vp.settings.useDepthPeeling=True
+# vp.settings.useFXAA=True
 
-# sphere = pv.Sphere(radius=0.85)
-# start = [0, 0, 0]
-# def __ray_casting(j, stop):
-#     print(start)
-#     print(stop)
-#     points, ind = sphere.ray_trace(start, stop)
-#
-#     print(points)
-#     print(ind)
-#
-#     return points, ind
+import trimesh
 
 def test_isocell_ray_casting():
     # Create source to ray trace
-    sphere = pv.Sphere(radius=0.85)
+    # sphere = pv.Sphere(radius=0.85)
+    # sphere1 = vp.Sphere(r=0.85, c="r", alpha=0.1).lw(0.1)
+    # mesh = trimesh.Trimesh(vertices=sphere1.points(), faces=sphere1.faces(), process=False)
+    mesh = trimesh.creation.icosphere()
 
-    p1 = vp.Plotter()
-    p2 = vp.Plotter()
-    test_sphere = vp.Sphere()
-    p1.show(test_sphere, axes=1)
-    p2.show(test_sphere, axes=1)
-    vp.show(1, pv.Cube(), axes=1)
-
-    # faces = pv.convert_array(sphere.GetFaces())
 
     # Create isocell rays
     isocell = Isocell(rays=1000, div=5, isrand=0, draw_cells=True)
@@ -45,37 +31,57 @@ def test_isocell_ray_casting():
 
     # Define line segment
     start = [0, 0, 0]
-    # stop = [[0, 0, 1]]
-    # stop = [0.25, 1, 0.5]
-    # stop = ([0.25, 1, 0.5],[0.5, 1, 0.25])
     endPoints = drays
 
-    # with ThreadPool(processes=4) as pool:
-    #     points1, ind1 = zip(*pool.starmap(__ray_casting, enumerate(stop)))
+    # intersects_location requires origins to be the same shape as vectors
+    origins = np.tile(np.expand_dims(start, 0), (len(drays), 1))
 
-    # Render the result
+    # do the actual ray- mesh queries
+    points, index_ray, index_tri = mesh.ray.intersects_location(origins, drays, multiple_hits=False)
+
+    # for each hit, find the distance along its vector
+    # you could also do this against the single camera Z vector
+    depth = trimesh.util.diagonal_dot(points - start, drays[index_ray])
+
+    locs = trimesh.points.PointCloud(points)
+
+    # # stack rays into line segments for visualization as Path3D
+    # ray_visualize = trimesh.load_path(np.hstack((origins, origins + drays * 1.2)).reshape(-1, 2, 3))
+
+    # render the result with vtkplotter
+    axes = vp.addons.buildAxes(vp.trimesh2vtk(mesh), c='k', zxGrid2=True)
+    # vp.show(mesh, ray_visualize, axes, locs, axes=4)
+    lines = vp.Lines(origins,drays, c='b')
+    vp.show(mesh, lines, axes, locs, axes=4)
+
+    # Render the result with pyvista
+    sphere = pv.PolyData(mesh.vertices, np.hstack((np.full((len(mesh.faces), 1), 3), mesh.faces)))
     p = pv.Plotter()
     p.add_mesh(sphere,
                show_edges=True, opacity=0.5, color="w",
                lighting=False, label="Test Mesh")
+    # p.add_arrows(origins[1,:], drays[1,:], mag=1, color=True, opacity=0.5, )
+    p.add_lines(np.hstack([origins,drays]).reshape(-1,3), color='b')
+    # intersections = pv.PolyData(points)
+    # p.add_mesh(intersections, color="maroon", point_size=25, label="Intersection Points")
 
-    for i, stop in enumerate(drays):
-
-        # Perform ray trace
-        points, ind = sphere.ray_trace(start, stop)
-
-        # Create geometry to represent ray trace
-        ray = pv.Line(start, stop)
-        intersection = pv.PolyData(points)
-
-
-
-        # pv.plot_arrows(np.array(start),np.array(stop))
-        # pv.plot_arrows(np.array(start),np.array(stop))
-        p.add_mesh(ray, color="blue", line_width=5, label="Ray Segment")
-        p.add_mesh(intersection, color="maroon",
-                   point_size=25, label="Intersection Points")
-    p.add_legend()
+    # for i, stop in enumerate(drays):
+    #
+    #     # Perform ray trace
+    #     points, ind = sphere.ray_trace(start, stop)
+    #
+    #     # Create geometry to represent ray trace
+    #     ray = pv.Line(start, stop)
+    #     intersection = pv.PolyData(points)
+    #
+    #
+    #
+    #     # pv.plot_arrows(np.array(start),np.array(stop))
+    #     # pv.plot_arrows(np.array(start),np.array(stop))
+    #     p.add_mesh(ray, color="blue", line_width=5, label="Ray Segment")
+    #     p.add_mesh(intersection, color="maroon",
+    #                point_size=25, label="Intersection Points")
+    # p.add_legend()
     p.show()
 
 
