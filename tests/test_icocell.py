@@ -3,6 +3,7 @@
 #
 import matplotlib
 import matplotlib.pyplot as plt
+# plt.ion()
 matplotlib.use('Qt5Agg')
 #
 # import pyvista as pv
@@ -65,11 +66,39 @@ matplotlib.use('Qt5Agg')
 
 
 import time
-import multiprocessing
+# import multiprocessing
+import pathos.multiprocessing
 import os
 import sys
 import pyvista
 import numpy as np
+import vtkplotter as vp
+import psutil
+import vtk
+
+def checkIfProcessRunning(processName):
+    '''
+    Check if there is any running process that contains the given name processName.
+    '''
+    #Iterate over the all the running process
+    for proc in psutil.process_iter():
+        try:
+            # Check if process name contains the given name string.
+            if processName.lower() in proc.name().lower():
+                return True
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            pass
+    return False;
+
+def plot_mesh_vtkplotter():
+    print(pathos.multiprocessing.current_process())
+    print(os.getpid())
+    sphere = vp.Sphere().smoothWSinc().x(0.2).alpha(0.1).lw(0.1)
+    cube = vp.Cube()
+
+    p1 = vp.Plotter()
+
+    p1.show(sphere, cube, interactive=True)
 
 def plot_mesh():
 
@@ -112,13 +141,25 @@ if __name__ == "__main__":
     theta = 2 * np.pi * r
     # fig.plot(theta, r, color='red')
     # proc = multiprocessing.Process(target=plot_mesh, args=())
-    proc = multiprocessing.Process(target=plot_graph, args=([theta, r], 'red', False,))
+    # proc = multiprocessing.Process(target=plot_graph, args=([theta, r], 'red', False,))
+    proc = pathos.helpers.mp.process.Process(target=plot_mesh_vtkplotter, args=())
+    
     proc.daemon = False
     proc.start()
     time.sleep(1)
+
+    # Check if any chrome process was running or not.
+    if checkIfProcessRunning('Python'):
+        print('Yes a vtkplotter process was running')
+    else:
+        print('No vtkplotter process was running')
+
+    print(vp.settings.plotter_instance)  # this prints None
+
+    # vp.show(0,vp.Cube())
 
     # plt.show()
 
     print("exiting main")
     os._exit(0) # this exits immediately with no cleanup or buffer flushing
-    # sys.exit()  # this exits the main process
+#     # sys.exit()  # this exits the main process
