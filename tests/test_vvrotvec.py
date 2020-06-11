@@ -42,6 +42,8 @@ def test_vvrotvec():
 
 
 ################ test case nx3 vector vs 1x3 vector
+
+    # [[ 0. -0.  1.], [ 0. -0.  1.]] - [0, 0, 1]
     rot = r.vvrotvec(np.vstack([[0, 0, 0],[0, 0, 0]]), [0, 1, 0])
 
     M = r.vrrotvec2mat(rot)
@@ -74,6 +76,9 @@ def test_vrrotvec2mat():
 if __name__ == '__main__':
     print('Testing the rotation module!!!!')
 
+    # M = r.vrrotvec2mat([0, -0, 1], [0, 0, 1])
+    # x1 = r.vvrotvec([0, -0, 1], [0, 0, 1])
+    # x2 = r.vvrotvec(np.vstack([[0, -0, 1], [0, -0, 1]]), [0, 0, 1])
     test_vvrotvec()
     test_vrrotvec2mat()
     print("exiting main")

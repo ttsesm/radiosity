@@ -16,6 +16,14 @@ import pyvista as pv
 from utils.triangle import Triangle, vectorize, distance
 
 from utils import Isocell
+import trimesh
+import vtkplotter as vp
+
+from utils import rotation as r
+
+from joblib import Parallel, delayed
+
+from numba import jit, cuda
 
 
 class FormFactor(object):
@@ -24,7 +32,8 @@ class FormFactor(object):
         if not args:
             return
         elif len(args) == 1:
-            if isinstance(args[0], pv.PolyData):
+            # if isinstance(args[0], pv.PolyData):
+            if isinstance(args[0], trimesh.Trimesh):
                 self.mesh = args[0]
             else:
                 raise TypeError('Invalid input type')
@@ -32,11 +41,14 @@ class FormFactor(object):
         # self.f # scene faces
         # self.v # scene vertices
 
-        self.__patch_count = self.mesh.n_faces
+        self.__patch_count = self.mesh.faces.shape[0]
+        # self.__patch_count = self.mesh.n_faces
         # self.__patch_count = 100
 
         # self.ffs = np.zeros(shape=(self.mesh.faces.size, self.mesh.faces.size),dtype='float32')
-        self.ffs = np.ones(shape=(self.mesh.faces.size, self.mesh.faces.size),dtype='float32')
+        # self.ffs = np.ones(shape=(self.mesh.faces.size, self.mesh.faces.size),dtype='float32')
+        # self.ffs = np.ones(shape=(self.__patch_count, self.__patch_count), dtype='float32')
+        self.ffs = np.zeros(shape=(self.__patch_count, self.__patch_count), dtype='float32')
         # self.ffs = np.ones(shape=(100,100),dtype='float32')
 
         self.__n_rays = kwargs.pop('rays', 1000)
@@ -47,24 +59,96 @@ class FormFactor(object):
 
         print()
 
+    # function optimized to run on gpu
+    @jit(target="cuda")
+    def __calculate_form_factors(self):
+
+        # calculate the rotation matrix between the face normal and the isocell unit sphere's original position and rotate the rays accordingly to match the face normal direction
+        face_normals = self.mesh.face_normals
+        # # # test1 = r.vvrotvec(self.mesh.face_normals[1,:], [0, 0, 1])
+        # # test1 = r.vvrotvec(face_normals[591:593,:], [0, 0, 1])
+        # # test = r.vvrotvec(face_normals, [0, 0, 1])
+        # rotation_matrices = r.vrrotvec2mat(face_normals, [0, 0, 1])
+        #
+        # # drays = np.einsum('ijk,ak->iak', rotation_matrices, self.isocell.points)
+        # # drays = np.einsum('ijj,aj->iaj', rotation_matrices, self.isocell.points)
+        # drays = np.einsum('ijk,aj->iak', rotation_matrices, self.isocell.points)
+        #
+        # # get the centroid of the face/patch and shift it a bit so that rays do not stop at the self face thrown from
+        # start_points = self.mesh.triangles_center  # the face/patch center points
+        # offset = np.sign(face_normals)
+        # offset = offset * 1e-5
+        # origins = start_points + offset
+        #
+        # # intersects_location requires origins to be the same shape as vectors
+        # origins = np.repeat(origins, self.isocell.points.shape[0], axis=0)
+        # # origins = np.tile(np.expand_dims(start_points, 0), (drays.shape[0], 1)) + offset
+        #
+        # intersection_points, index_ray, index_tri = self.mesh.ray.intersects_location(origins, drays.reshape(-1, 3), multiple_hits=False)
+
+        return
+
     def __calculate_one_patch_form_factor(self, i, p_1):
         # print('[form factor] patch {}/{} ...'.format(i, self.__patch_count))
         # create empty form factor array
         # ff = np.ones(self.__patch_count)*i
         self.ffs[i,:] *= i
 
+        # calculate the rotation matrix between the face normal and the isocell unit sphere's original position and rotate the rays accordingly to match the face normal direction
+        face_normal = self.mesh.face_normals[i,:].reshape(-1,3) # corresponding face normal
+        drays = ((self.isocell.points @ r.vrrotvec2mat(face_normal, [0, 0, 1]).T).T).reshape(-1, 3)
+
+        # get the centroid of the face/patch and shift it a bit so that rays do not stop at the self face thrown from
+        start_point = self.mesh.triangles_center[i, :]  # the face/patch center point
+        offset = np.sign(face_normal)
+        offset = offset * 1e-5
+
+        # intersects_location requires origins to be the same shape as vectors
+        origins = np.tile(np.expand_dims(start_point, 0), (drays.shape[0], 1)) + offset
+        # lines = vp.Lines(origins,drays+start_point, c='b', scale=1100)
+        # vp.show(lines, axes=1)
+        # origins[:, 0] = origins[:, 0] - 100
+
+        # do the actual ray- mesh queries
+        intersection_points, index_ray, index_tri = self.mesh.ray.intersects_location(origins, drays, multiple_hits=False)
+
+        # locs = trimesh.points.PointCloud(intersection_points)
+
+        # # render the result with vtkplotter
+        # axes = vp.addons.buildAxes(vp.trimesh2vtk(self.mesh), c='k', zxGrid2=True)
+        # lines = vp.Lines(origins, drays+origins, c='b', scale=200)
+        # locs = vp.Points(intersection_points, c='r')
+        # # rays = vp.Arrows(origins, drays+start_point, c='b', scale=1000)
+        # normal = vp.Arrows(start_point.reshape(-1,3), face_normal+start_point.reshape(-1,3), c='g', scale=250)
+        # vp.show(vp.trimesh2vtk(self.mesh).alpha(0.1).lw(0.1), locs, lines, normal, axes, axes=4)
+        #
+        # # for each hit, find the distance along its vector
+        # # you could also do this against the single camera Z vector
+        # depth = trimesh.util.diagonal_dot(intersection_points - start_point, drays[index_ray])
+
         # return ff
+        print('[form factor] patch {}/{} ... intersections: {}'.format(i, self.__patch_count, len(intersection_points)))
 
     def __get_faces(self, faces, num_of_vertices=3):
         return faces.reshape(-1,num_of_vertices+1)[:,1:num_of_vertices+1]
 
     def calculate_form_factor(self, processes=4):
-        with ThreadPool(processes=processes) as pool:
-            # for i, num in enumerate(np.arange(1,10)):
-            #     print('[form factor] patch {}/{} ...'.format(i, self.__patch_count))
-            ffs = pool.starmap(self.__calculate_one_patch_form_factor, enumerate((self.__get_faces(self.mesh.faces))))
-            # ffs = pool.starmap(self.__calculate_one_patch_form_factor, enumerate(np.arange(0,100)))
-            # pool.starmap(self.__calculate_one_patch_form_factor, enumerate(np.arange(0,100)))
+
+        ffs = self.__calculate_form_factors()
+
+        # Parallel(n_jobs=5, prefer="threads")(delayed(self.__calculate_one_patch_form_factor)(i, p_1) for i, p_1 in enumerate(self.mesh.faces))
+
+        # # for i, p_i in enumerate(self.mesh.faces):
+        # #     self.__calculate_one_patch_form_factor(i, p_i)
+        #
+        # with ThreadPool(processes=processes) as pool:
+        #     # for i, num in enumerate(np.arange(1,10)):
+        #     #     print('[form factor] patch {}/{} ...'.format(i, self.__patch_count))
+        #     # ffs = pool.starmap(self.__calculate_one_patch_form_factor, enumerate((self.__get_faces(self.mesh.faces))))
+        #     ffs = pool.starmap(self.__calculate_one_patch_form_factor, enumerate(self.mesh.faces))
+        #     # self.__calculate_one_patch_form_factor(0, self.mesh.faces[0,:])
+        #     # ffs = pool.starmap(self.__calculate_one_patch_form_factor, enumerate(np.arange(0,100)))
+        #     # pool.starmap(self.__calculate_one_patch_form_factor, enumerate(np.arange(0,100)))
 
         return np.array(self.ffs)
 

@@ -19,9 +19,9 @@ import trimesh
 def test_isocell_ray_casting():
     # Create source to ray trace
     # sphere = pv.Sphere(radius=0.85)
-    # sphere1 = vp.Sphere(r=0.85, c="r", alpha=0.1).lw(0.1)
-    # mesh = trimesh.Trimesh(vertices=sphere1.points(), faces=sphere1.faces(), process=False)
-    mesh = trimesh.creation.icosphere()
+    sphere1 = vp.Sphere(r=0.85, c="r", alpha=0.1).lw(0.1)
+    mesh = trimesh.Trimesh(vertices=sphere1.points(), faces=sphere1.faces(), process=False, use_embree=True)
+    # mesh = trimesh.creation.icosphere()
 
 
     # Create isocell rays
@@ -52,7 +52,7 @@ def test_isocell_ray_casting():
     axes = vp.addons.buildAxes(vp.trimesh2vtk(mesh), c='k', zxGrid2=True)
     # vp.show(mesh, ray_visualize, axes, locs, axes=4)
     lines = vp.Lines(origins,drays, c='b')
-    vp.show(mesh, lines, axes, locs, axes=4)
+    vp.show(vp.trimesh2vtk(mesh).alpha(0.1).lw(0.1), lines, axes, locs, axes=4)
 
     # Render the result with pyvista
     sphere = pv.PolyData(mesh.vertices, np.hstack((np.full((len(mesh.faces), 1), 3), mesh.faces)))

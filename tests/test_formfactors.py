@@ -14,6 +14,10 @@ matplotlib.use('Qt5Agg')
 
 import pyvista as pv
 import open3d as o3d
+import trimesh
+import vtkplotter as vp
+
+from numba import jit, cuda
 
 def plot_mesh(verts, faces):
     # points = isocell.points
@@ -37,7 +41,7 @@ def test_formfactors():
 
     # manual retrieval (TODO: check if this can be handled automatically somehow)
     faces = data['cadModel_'][0][0][0] - 1
-    faces = np.insert(faces, 0, 3, axis=1)
+    # faces = np.insert(faces, 0, 3, axis=1)
     # vertices = np.vstack([[0,0,0], data['cadModel_'][0][0][1]])
     vertices = data['cadModel_'][0][0][1]
     floor_patches = data['cadModel_'][0][0][2] - 1
@@ -83,7 +87,9 @@ def test_formfactors():
     # mesh.triangle_normals = o3d.utility.Vector3dVector(normals)
     # o3d.visualization.draw_geometries([mesh])
 
-    mesh = pv.PolyData(vertices, faces)
+    # mesh = pv.PolyData(vertices, faces)
+    mesh = trimesh.Trimesh(vertices=vertices, faces=faces, face_normals=normals, process=False, use_embree=True)
+    # vp.show(vp.trimesh2vtk(mesh).alpha(0.1).lw(0.1), axes=4)
 
     # ff = FormFactor(mesh)
     # ffs = FormFactor(mesh).calculate_form_factor(processes=5)
@@ -92,9 +98,20 @@ def test_formfactors():
     print('End testing the form factors module!!!!')
     # plt.show()
 
+# function optimized to run on gpu
+@jit(target ="cuda")
+def func2(a):
+    for i in range(10000000):
+        a[i]+= 1
+
 
 
 if __name__ == '__main__':
     print('Testing the formfactors module!!!!')
-    test_formfactors()
+    # test_formfactors()
+    n = 10000000
+    a = np.ones(n, dtype=np.float64)
+    b = np.ones(n, dtype=np.float32)
+
+    func2(a)
     os._exit(0)
