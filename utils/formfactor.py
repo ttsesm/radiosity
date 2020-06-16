@@ -17,6 +17,7 @@ from utils.triangle import Triangle, vectorize, distance
 
 from utils import Isocell
 import trimesh
+import pyembree
 import vtkplotter as vp
 
 from utils import rotation as r
@@ -59,32 +60,32 @@ class FormFactor(object):
 
         print()
 
-    # function optimized to run on gpu
-    @jit(target="cuda")
+    # # function optimized to run on gpu
+    # @jit(target="cuda")
     def __calculate_form_factors(self):
 
         # calculate the rotation matrix between the face normal and the isocell unit sphere's original position and rotate the rays accordingly to match the face normal direction
         face_normals = self.mesh.face_normals
-        # # # test1 = r.vvrotvec(self.mesh.face_normals[1,:], [0, 0, 1])
-        # # test1 = r.vvrotvec(face_normals[591:593,:], [0, 0, 1])
-        # # test = r.vvrotvec(face_normals, [0, 0, 1])
-        # rotation_matrices = r.vrrotvec2mat(face_normals, [0, 0, 1])
-        #
-        # # drays = np.einsum('ijk,ak->iak', rotation_matrices, self.isocell.points)
-        # # drays = np.einsum('ijj,aj->iaj', rotation_matrices, self.isocell.points)
-        # drays = np.einsum('ijk,aj->iak', rotation_matrices, self.isocell.points)
-        #
-        # # get the centroid of the face/patch and shift it a bit so that rays do not stop at the self face thrown from
-        # start_points = self.mesh.triangles_center  # the face/patch center points
-        # offset = np.sign(face_normals)
-        # offset = offset * 1e-5
-        # origins = start_points + offset
-        #
-        # # intersects_location requires origins to be the same shape as vectors
-        # origins = np.repeat(origins, self.isocell.points.shape[0], axis=0)
-        # # origins = np.tile(np.expand_dims(start_points, 0), (drays.shape[0], 1)) + offset
-        #
-        # intersection_points, index_ray, index_tri = self.mesh.ray.intersects_location(origins, drays.reshape(-1, 3), multiple_hits=False)
+        # # test1 = r.vvrotvec(self.mesh.face_normals[1,:], [0, 0, 1])
+        # test1 = r.vvrotvec(face_normals[591:593,:], [0, 0, 1])
+        # test = r.vvrotvec(face_normals, [0, 0, 1])
+        rotation_matrices = r.vrrotvec2mat(face_normals, [0, 0, 1])
+
+        # drays = np.einsum('ijk,ak->iak', rotation_matrices, self.isocell.points)
+        # drays = np.einsum('ijj,aj->iaj', rotation_matrices, self.isocell.points)
+        drays = np.einsum('ijk,aj->iak', rotation_matrices, self.isocell.points)
+
+        # get the centroid of the face/patch and shift it a bit so that rays do not stop at the self face thrown from
+        start_points = self.mesh.triangles_center  # the face/patch center points
+        offset = np.sign(face_normals)
+        offset = offset * 1e-5
+        origins = start_points + offset
+
+        # intersects_location requires origins to be the same shape as vectors
+        origins = np.repeat(origins, self.isocell.points.shape[0], axis=0)
+        # origins = np.tile(np.expand_dims(start_points, 0), (drays.shape[0], 1)) + offset
+
+        intersection_points, index_ray, index_tri = self.mesh.ray.intersects_location(origins, drays.reshape(-1, 3), multiple_hits=False)
 
         return
 
@@ -136,8 +137,8 @@ class FormFactor(object):
 
         ffs = self.__calculate_form_factors()
 
-        # Parallel(n_jobs=5, prefer="threads")(delayed(self.__calculate_one_patch_form_factor)(i, p_1) for i, p_1 in enumerate(self.mesh.faces))
-
+        # # Parallel(n_jobs=5, prefer="threads")(delayed(self.__calculate_one_patch_form_factor)(i, p_1) for i, p_1 in enumerate(self.mesh.faces))
+        #
         # # for i, p_i in enumerate(self.mesh.faces):
         # #     self.__calculate_one_patch_form_factor(i, p_i)
         #

@@ -15,6 +15,7 @@ matplotlib.use('Qt5Agg')
 import pyvista as pv
 import open3d as o3d
 import trimesh
+import pyembree
 import vtkplotter as vp
 
 from numba import jit, cuda
@@ -99,7 +100,7 @@ def test_formfactors():
     # plt.show()
 
 # function optimized to run on gpu
-@jit(target ="cuda")
+@jit(target ='cuda')
 def func2(a):
     for i in range(10000000):
         a[i]+= 1
@@ -108,10 +109,10 @@ def func2(a):
 
 if __name__ == '__main__':
     print('Testing the formfactors module!!!!')
-    # test_formfactors()
-    n = 10000000
-    a = np.ones(n, dtype=np.float64)
-    b = np.ones(n, dtype=np.float32)
-
-    func2(a)
+    test_formfactors()
+    # n = 10000000
+    # a = np.ones(n, dtype=np.float64)
+    # b = np.ones(n, dtype=np.float32)
+    #
+    # func2(a)
     os._exit(0)
