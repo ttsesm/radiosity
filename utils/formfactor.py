@@ -6,8 +6,10 @@ from multiprocessing.dummy import Pool as ThreadPool
 # from pathos.multiprocessing import ProcessingPool as Pool
 
 import numpy as np
-from numpy.core.umath_tests import inner1d
+import numpy_indexed as npi
+# from numpy.core.umath_tests import inner1d
 
+import time
 import open3d as o3d
 
 import vtk
@@ -18,6 +20,7 @@ from utils.triangle import Triangle, vectorize, distance
 from utils import Isocell
 import trimesh
 import pyembree
+# from pyoctree import pyoctree as ot
 import vtkplotter as vp
 
 from utils import rotation as r
@@ -69,7 +72,8 @@ class FormFactor(object):
         # # test1 = r.vvrotvec(self.mesh.face_normals[1,:], [0, 0, 1])
         # test1 = r.vvrotvec(face_normals[591:593,:], [0, 0, 1])
         # test = r.vvrotvec(face_normals, [0, 0, 1])
-        rotation_matrices = r.vrrotvec2mat(face_normals, [0, 0, 1])
+        # rotation_matrices = r.vrrotvec2mat(face_normals, [0, 0, 1])
+        rotation_matrices = r.rotation_matrices_from_vectors(face_normals, [0, 0, 1])
 
         # drays = np.einsum('ijk,ak->iak', rotation_matrices, self.isocell.points)
         # drays = np.einsum('ijj,aj->iaj', rotation_matrices, self.isocell.points)
@@ -85,7 +89,45 @@ class FormFactor(object):
         origins = np.repeat(origins, self.isocell.points.shape[0], axis=0)
         # origins = np.tile(np.expand_dims(start_points, 0), (drays.shape[0], 1)) + offset
 
+        # tree = ot.PyOctree(self.mesh.vertices.copy(order='C'), self.mesh.faces.copy(order='C').astype(np.int32))
+        # rayList = np.array([origins, drays.reshape(-1, 3)], dtype=np.float32)
+        # startPoint = [0.0, 0.0, 0.0]
+        # endPoint = [0.0, 0.0, 1.0]
+        # rayList1 = np.array([[startPoint, endPoint]], dtype=np.float32)
+        # intersectionFound = tree.rayIntersection(rayList)
+
+        # start casting and find intersection points, rays and faces
+        start = time.time()
         intersection_points, index_ray, index_tri = self.mesh.ray.intersects_location(origins, drays.reshape(-1, 3), multiple_hits=False)
+        end = time.time()
+        print(end - start)
+        # tree = ot.PyOctree(vertices.copy(order='C'), faces.copy(order='C').astype(np.int32))
+
+        # find the indices of rays that did not intersect to any face and recover the size of the total casted rays
+        no_intersection_rays = np.arange(origins.shape[0])
+        idxs_of_no_intersection_rays = no_intersection_rays[~np.isin(np.arange(no_intersection_rays.size), index_ray)]
+
+        # if there are no intersection rays, adjust sizes in the output
+        if idxs_of_no_intersection_rays.any():
+            index_ray = np.insert(index_ray, idxs_of_no_intersection_rays, -1)
+            index_tri = np.insert(index_tri, idxs_of_no_intersection_rays, -1)
+            intersection_points = np.insert(intersection_points, idxs_of_no_intersection_rays, -np.inf, axis=0)
+
+        # eq = npi.group_by(origins[index_ray])
+
+        # locs = trimesh.points.PointCloud(intersection_points)
+
+        # render the result with vtkplotter
+        axes = vp.addons.buildAxes(vp.trimesh2vtk(self.mesh), c='k', zxGrid2=True)
+        rays = vp.Lines(origins[0:1083,:], drays[0,0:1083,:].reshape(-1,3)+origins[0:1083,:], c='b', scale=200)
+        locs = vp.Points(intersection_points[0:1083,:], c='r')
+        # rays = vp.Arrows(origins, drays+start_point, c='b', scale=1000)
+        normal = vp.Arrows(start_points[0,:].reshape(-1,3), (face_normals[0,:]+start_points[0,:]).reshape(-1,3), c='g', scale=250)
+        vp.show(vp.trimesh2vtk(self.mesh).alpha(0.1).lw(0.1), locs, rays, normal, axes, axes=4)
+
+        # # for each hit, find the distance along its vector
+        # # you could also do this against the single camera Z vector
+        # depth = trimesh.util.diagonal_dot(intersection_points - start_point, drays[index_ray])
 
         return
 
@@ -139,8 +181,8 @@ class FormFactor(object):
 
         # # Parallel(n_jobs=5, prefer="threads")(delayed(self.__calculate_one_patch_form_factor)(i, p_1) for i, p_1 in enumerate(self.mesh.faces))
         #
-        # # for i, p_i in enumerate(self.mesh.faces):
-        # #     self.__calculate_one_patch_form_factor(i, p_i)
+        # for i, p_i in enumerate(self.mesh.faces):
+        #     self.__calculate_one_patch_form_factor(i, p_i)
         #
         # with ThreadPool(processes=processes) as pool:
         #     # for i, num in enumerate(np.arange(1,10)):

@@ -16,7 +16,10 @@ import pyvista as pv
 import open3d as o3d
 import trimesh
 import pyembree
+# from pyoctree import pyoctree as ot
 import vtkplotter as vp
+
+print("testss!!!!")
 
 from numba import jit, cuda
 
@@ -87,6 +90,36 @@ def test_formfactors():
     # # mesh.triangles = o3d.utility.Vector3iVector(faces[np.vstack([floor_patches, wall_patches, desk_patches, leg_desk_patches, panel_patches, panel_handle_patches, light_patches]),:].reshape(-1,3))
     # mesh.triangle_normals = o3d.utility.Vector3dVector(normals)
     # o3d.visualization.draw_geometries([mesh])
+
+    # vector = np.array([0, 0, 1])
+    # vector1 = np.array([0, 0, -1.3])
+    # startpoint = np.array([0,0,-1.5])
+    # m = trimesh.creation.icosphere()
+    # # m.invert()
+    #
+    # # dots = np.dot(m.face_normals, vector)
+    # # dots = dots / np.linalg.norm(startpoint - m.face_normals, axis=1)
+    # # # # front_facing = dots < 1e-5
+    # # front_facing = dots < 0
+    #
+    # directional_dist = startpoint - m.triangles_center
+    # isPointingToward = np.einsum("ij,ij->i", directional_dist, m.face_normals) / np.linalg.norm(directional_dist, axis=1)
+    #
+    # # directional_dist = startpoint - m.triangles_center
+    # # isInFOV = np.arccos(np.einsum("ij,ij->i", -1*directional_dist, m.face_normals) / np.linalg.norm(-1*directional_dist, axis=1))
+    # isInFOV = np.arccos(np.dot(-1*directional_dist, vector) / np.linalg.norm(-1*directional_dist, axis=1))
+    # front_facing = np.logical_and(isPointingToward > 0, isInFOV <= 90)
+    # # front_facing = isPointingToward > 0
+    #
+    # # axes = vp.addons.buildAxes(vp.trimesh2vtk(m), c='k', zxGrid2=True)
+    # ray = vp.Arrows(startpoint.reshape(-1,3), vector1.reshape(-1,3), c='g')
+    # # vp.show(vp.trimesh2vtk(m).alpha(0.1).lw(0.1), normal, axes, axes=4)
+    #
+    # m.update_faces(front_facing)
+    # axes = vp.addons.buildAxes(vp.trimesh2vtk(m), c='k', zxGrid2=True)
+    # # normals = vp.Lines(m.triangles_center, m.triangles_center+m.face_normals, c='b', scale=.2)
+    # # vp.show(normal, axes, axes=4)
+    # vp.show(vp.trimesh2vtk(m).alpha(0.1).lw(0.1), normals, ray, axes, axes=4)
 
     # mesh = pv.PolyData(vertices, faces)
     mesh = trimesh.Trimesh(vertices=vertices, faces=faces, face_normals=normals, process=False, use_embree=True)
