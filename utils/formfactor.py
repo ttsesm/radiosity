@@ -28,6 +28,7 @@ from utils import rotation as r
 from joblib import Parallel, delayed
 
 from numba import jit, cuda
+import matplotlib.pylab as plt
 
 
 class FormFactor(object):
@@ -82,7 +83,7 @@ class FormFactor(object):
         # get the centroid of the face/patch and shift it a bit so that rays do not stop at the self face thrown from
         start_points = self.mesh.triangles_center  # the face/patch center points
         offset = np.sign(face_normals)
-        offset = offset * 1e-5
+        offset = offset * 1e-3
         origins = start_points + offset
 
         # intersects_location requires origins to be the same shape as vectors
@@ -100,19 +101,76 @@ class FormFactor(object):
         start = time.time()
         intersection_points, index_ray, index_tri = self.mesh.ray.intersects_location(origins, drays.reshape(-1, 3), multiple_hits=False)
         end = time.time()
-        print(end - start)
+        print('Ray casting in: {} sec'.format(end - start))
         # tree = ot.PyOctree(vertices.copy(order='C'), faces.copy(order='C').astype(np.int32))
+
+        # check whether there were / print intersection points
+        print('Intersections: {}/{}'.format(len(intersection_points), len(origins)))
+
+        # check whether the extracted intersection output size is correct and fits the input
+        if intersection_points.shape[0]!=index_ray.shape[0]!=index_tri.shape[0]:
+            raise Exception('bad size alignment to the intersection ouput matrices')
 
         # find the indices of rays that did not intersect to any face and recover the size of the total casted rays
         no_intersection_rays = np.arange(origins.shape[0])
         idxs_of_no_intersection_rays = no_intersection_rays[~np.isin(np.arange(no_intersection_rays.size), index_ray)]
 
-        # if there are no intersection rays, adjust sizes in the output
+        # check whether there are no_intersection_rays, and if yes adjust sizes in the output
         if idxs_of_no_intersection_rays.any():
-            index_ray = np.insert(index_ray, idxs_of_no_intersection_rays, -1)
-            index_tri = np.insert(index_tri, idxs_of_no_intersection_rays, -1)
-            intersection_points = np.insert(intersection_points, idxs_of_no_intersection_rays, -np.inf, axis=0)
+            # first apply backface culling and filter intersections from rays hitting faces from the back side
+            # TODO: this could be addressed optimally by embree if it gets compiled with the corresponding parameter
+            front_facing = self.__isFacing(np.delete(origins, idxs_of_no_intersection_rays, axis=0), np.delete(np.repeat(face_normals, self.isocell.points.shape[0], axis=0), idxs_of_no_intersection_rays, axis=0), index_tri)
 
+            index_ray[np.where(front_facing == False)] = -1
+            index_tri[np.where(front_facing == False)] = -1
+            intersection_points[np.where(front_facing == False)] = -np.inf
+
+            # index_ray = np.insert(index_ray, idxs_of_no_intersection_rays, -1) # simple insert does not work properly. See: https://stackoverflow.com/questions/47442115/insert-values-at-specific-locations-in-numpy-array-np-insert-done-right
+            index_ray = np.insert(index_ray, idxs_of_no_intersection_rays - np.arange(len(idxs_of_no_intersection_rays)), -1)
+            # index_tri = np.insert(index_tri, idxs_of_no_intersection_rays, -1)
+            index_tri = np.insert(index_tri, idxs_of_no_intersection_rays - np.arange(len(idxs_of_no_intersection_rays)), -1)
+            # intersection_points = np.insert(intersection_points, idxs_of_no_intersection_rays, -np.inf, axis=0)
+            intersection_points = np.insert(intersection_points, idxs_of_no_intersection_rays - np.arange(len(idxs_of_no_intersection_rays)), -np.inf, axis=0)
+
+        else:
+            front_facing = self.__isFacing(origins, np.repeat(face_normals, self.isocell.points.shape[0], axis=0), index_tri)
+            index_ray[np.where(front_facing == False)] = -1
+            index_tri[np.where(front_facing == False)] = -1
+            intersection_points[np.where(front_facing == False)] = -np.inf
+
+        index_ray = index_ray.reshape(drays.shape[0],-1)
+        index_tri = index_tri.reshape(drays.shape[0], -1)
+        intersection_points = intersection_points.reshape(drays.shape[0], drays.shape[1], -1)
+
+        # Bin elements per row from the intersected triangles matrix, i.e. index_tri
+        # See:
+        # https://stackoverflow.com/questions/62662346/map-amount-of-repeated-elements-row-wise-from-a-numpy-array-to-another?noredirect=1#comment110814113_62662346
+        # https://stackoverflow.com/questions/46256279/bin-elements-per-row-vectorized-2d-bincount-for-numpy and
+        # https://stackoverflow.com/a/40593110/1476932
+        # solution addapted from the last link
+        rowidx, colidx = np.indices(index_tri.shape)
+        (cols, rows), B = npi.count((index_tri.flatten(), rowidx.flatten()))
+
+        # remove negative indexing that we introduced from the missing intersections
+        negative_idxs = np.where(cols < 0)
+        cols = np.delete(cols, negative_idxs)
+        rows = np.delete(rows, negative_idxs)
+        B = np.delete(B, negative_idxs)
+
+        # assign values to the corresponding position of the form factors matrix
+        self.ffs[rows, cols] = B
+        self.ffs /= self.__n_rays
+
+        # # check whether there are no_intersection_rays, and if yes adjust sizes in the output
+        # if idxs_of_no_intersection_rays.any():
+        #     # first apply backface culling and filter intersections from rays hitting faces from the back side
+        #     # TODO: this could be addressed optimally by embree if it gets compiled with the corresponding parameter
+        #     front_facing = self.__isFacing(np.delete(origins, idxs_of_no_intersection_rays, axis=0), np.delete(np.repeat(face_normals, self.isocell.points.shape[0], axis=0), idxs_of_no_intersection_rays, axis=0), index_tri)
+        #
+        #     index_ray = np.delete(index_ray, np.where(front_facing == False))
+        #     index_tri = np.delete(index_tri, np.where(front_facing == False))
+        #     intersection_points = np.delete(intersection_points, np.where(front_facing == False), axis=0)
+        #
         # eq = npi.group_by(origins[index_ray])
 
         # locs = trimesh.points.PointCloud(intersection_points)
@@ -130,6 +188,31 @@ class FormFactor(object):
         # depth = trimesh.util.diagonal_dot(intersection_points - start_point, drays[index_ray])
 
         return
+
+    def __isFacing(self, startpoints, startpoints_normals, index_tri):
+
+        directional_dist = startpoints - self.mesh.triangles_center[index_tri]
+        isPointingToward = np.einsum("ij,ij->i", directional_dist, self.mesh.face_normals[index_tri]) / np.linalg.norm(directional_dist, axis=1)
+
+        # directional_dist = startpoint - m.triangles_center
+        isInFOV = np.arccos(np.einsum("ij,ij->i", -1*directional_dist, startpoints_normals) / np.linalg.norm(-1*directional_dist, axis=1))
+        # isInFOV = np.arccos(np.dot(-1 * directional_dist, vector) / np.linalg.norm(-1 * directional_dist, axis=1))
+        front_facing = np.logical_and(isPointingToward > 0, isInFOV <= 90)
+
+        # # Plot example of backface intersections
+        # idxs = np.where(front_facing == False)
+        # axes = vp.addons.buildAxes(vp.trimesh2vtk(self.mesh), c='k', zxGrid2=True)
+        #
+        # normal = vp.Arrows(startpoints[idxs[0][10000], :].reshape(-1, 3), (startpoints_normals[idxs[0][10000], :] + startpoints[idxs[0][10000], :]).reshape(-1, 3), c='g', scale=250)
+        # normal1 = vp.Arrows(self.mesh.triangles_center[index_tri[idxs[0][10000]], :].reshape(-1, 3), (self.mesh.face_normals[index_tri[idxs[0][10000]], :] + self.mesh.triangles_center[index_tri[idxs[0][10000]], :]).reshape(-1, 3), c='b', scale=250)
+        #
+        # # normal = vp.Arrows(startpoints[idxs[0], :].reshape(-1, 3), (startpoints_normals[idxs[0], :] + startpoints[idxs[0], :]).reshape(-1, 3), c='g', scale=250)
+        # # normal1 = vp.Arrows(self.mesh.triangles_center[index_tri[idxs[0]], :].reshape(-1, 3), (self.mesh.face_normals[index_tri[idxs[0]], :] + self.mesh.triangles_center[index_tri[idxs[0]], :]).reshape(-1, 3), c='b', scale=250)
+        #
+        #
+        # vp.show(vp.trimesh2vtk(self.mesh).alpha(0.1).lw(0.1), normal, normal1, axes, axes=4)
+
+        return front_facing
 
     def __calculate_one_patch_form_factor(self, i, p_1):
         # print('[form factor] patch {}/{} ...'.format(i, self.__patch_count))
@@ -175,7 +258,7 @@ class FormFactor(object):
     def __get_faces(self, faces, num_of_vertices=3):
         return faces.reshape(-1,num_of_vertices+1)[:,1:num_of_vertices+1]
 
-    def calculate_form_factor(self, processes=4):
+    def calculate_form_factors_matrix(self, processes=4):
 
         ffs = self.__calculate_form_factors()
 

@@ -127,7 +127,7 @@ def test_formfactors():
 
     # ff = FormFactor(mesh)
     # ffs = FormFactor(mesh).calculate_form_factor(processes=5)
-    ffs = FormFactor(mesh).calculate_form_factor(processes=multiprocessing.cpu_count() - 1)
+    ffs = FormFactor(mesh).calculate_form_factors_matrix(processes=multiprocessing.cpu_count() - 1)
 
     print('End testing the form factors module!!!!')
     # plt.show()
