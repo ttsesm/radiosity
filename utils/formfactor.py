@@ -18,6 +18,7 @@ import pyvista as pv
 from utils.triangle import Triangle, vectorize, distance
 
 from utils import Isocell
+from utils import LightDistributionCurve
 import trimesh
 import pyembree
 # from pyoctree import pyoctree as ot
@@ -29,6 +30,8 @@ from joblib import Parallel, delayed
 
 from numba import jit, cuda
 import matplotlib.pylab as plt
+
+import copy
 
 
 class FormFactor(object):
@@ -61,6 +64,7 @@ class FormFactor(object):
 
         # correct the number of rays created from the isocell casting
         self.__n_rays = self.isocell.points.shape[0]
+        self.__form_factor_properties = {}
 
         print()
 
@@ -68,17 +72,20 @@ class FormFactor(object):
     # @jit(target="cuda")
     def __calculate_form_factors(self):
 
-        # calculate the rotation matrix between the face normal and the isocell unit sphere's original position and rotate the rays accordingly to match the face normal direction
+        # calculate the rotation matrix between the face normal and the isocell unit sphere's
+        # original position and rotate the rays accordingly to match the face normal direction
         face_normals = self.mesh.face_normals
         # # test1 = r.vvrotvec(self.mesh.face_normals[1,:], [0, 0, 1])
         # test1 = r.vvrotvec(face_normals[591:593,:], [0, 0, 1])
         # test = r.vvrotvec(face_normals, [0, 0, 1])
         # rotation_matrices = r.vrrotvec2mat(face_normals, [0, 0, 1])
         rotation_matrices = r.rotation_matrices_from_vectors(face_normals, [0, 0, 1])
+        self.__form_factor_properties['rotation_matrices'] = rotation_matrices
 
         # drays = np.einsum('ijk,ak->iak', rotation_matrices, self.isocell.points)
         # drays = np.einsum('ijj,aj->iaj', rotation_matrices, self.isocell.points)
         drays = np.einsum('ijk,aj->iak', rotation_matrices, self.isocell.points)
+        self.__form_factor_properties['drays'] = drays
 
         # get the centroid of the face/patch and shift it a bit so that rays do not stop at the self face thrown from
         start_points = self.mesh.triangles_center  # the face/patch center points
@@ -87,7 +94,8 @@ class FormFactor(object):
         origins = start_points + offset
 
         # intersects_location requires origins to be the same shape as vectors
-        origins = np.repeat(origins, self.isocell.points.shape[0], axis=0)
+        origins = np.repeat(origins, self.__n_rays, axis=0)
+        self.__form_factor_properties['origins'] = origins.reshape(drays.shape[0], drays.shape[1], -1)
         # origins = np.tile(np.expand_dims(start_points, 0), (drays.shape[0], 1)) + offset
 
         # tree = ot.PyOctree(self.mesh.vertices.copy(order='C'), self.mesh.faces.copy(order='C').astype(np.int32))
@@ -119,7 +127,7 @@ class FormFactor(object):
         if idxs_of_no_intersection_rays.any():
             # first apply backface culling and filter intersections from rays hitting faces from the back side
             # TODO: this could be addressed optimally by embree if it gets compiled with the corresponding parameter
-            front_facing = self.__isFacing(np.delete(origins, idxs_of_no_intersection_rays, axis=0), np.delete(np.repeat(face_normals, self.isocell.points.shape[0], axis=0), idxs_of_no_intersection_rays, axis=0), index_tri)
+            front_facing = self.__isFacing(np.delete(origins, idxs_of_no_intersection_rays, axis=0), np.delete(np.repeat(face_normals, self.__n_rays, axis=0), idxs_of_no_intersection_rays, axis=0), index_tri)
 
             index_ray[np.where(front_facing == False)] = -1
             index_tri[np.where(front_facing == False)] = -1
@@ -133,14 +141,18 @@ class FormFactor(object):
             intersection_points = np.insert(intersection_points, idxs_of_no_intersection_rays - np.arange(len(idxs_of_no_intersection_rays)), -np.inf, axis=0)
 
         else:
-            front_facing = self.__isFacing(origins, np.repeat(face_normals, self.isocell.points.shape[0], axis=0), index_tri)
+            front_facing = self.__isFacing(origins, np.repeat(face_normals, self.__n_rays, axis=0), index_tri)
             index_ray[np.where(front_facing == False)] = -1
             index_tri[np.where(front_facing == False)] = -1
             intersection_points[np.where(front_facing == False)] = -np.inf
 
-        index_ray = index_ray.reshape(drays.shape[0],-1)
-        index_tri = index_tri.reshape(drays.shape[0], -1)
-        intersection_points = intersection_points.reshape(drays.shape[0], drays.shape[1], -1)
+        index_ray = index_ray.reshape(self.__patch_count, -1)
+        index_tri = index_tri.reshape(self.__patch_count, -1)
+        intersection_points = intersection_points.reshape(self.__patch_count, self.__n_rays, -1)
+
+        self.__form_factor_properties['index_rays'] = index_ray
+        self.__form_factor_properties['index_tri'] = index_tri
+        self.__form_factor_properties['intersection_points'] = intersection_points
 
         # Bin elements per row from the intersected triangles matrix, i.e. index_tri
         # See:
@@ -161,33 +173,33 @@ class FormFactor(object):
         self.ffs[rows, cols] = B
         self.ffs /= self.__n_rays
 
-        # # check whether there are no_intersection_rays, and if yes adjust sizes in the output
-        # if idxs_of_no_intersection_rays.any():
-        #     # first apply backface culling and filter intersections from rays hitting faces from the back side
-        #     # TODO: this could be addressed optimally by embree if it gets compiled with the corresponding parameter
-        #     front_facing = self.__isFacing(np.delete(origins, idxs_of_no_intersection_rays, axis=0), np.delete(np.repeat(face_normals, self.isocell.points.shape[0], axis=0), idxs_of_no_intersection_rays, axis=0), index_tri)
+        # # # check whether there are no_intersection_rays, and if yes adjust sizes in the output
+        # # if idxs_of_no_intersection_rays.any():
+        # #     # first apply backface culling and filter intersections from rays hitting faces from the back side
+        # #     # TODO: this could be addressed optimally by embree if it gets compiled with the corresponding parameter
+        # #     front_facing = self.__isFacing(np.delete(origins, idxs_of_no_intersection_rays, axis=0), np.delete(np.repeat(face_normals, self.isocell.points.shape[0], axis=0), idxs_of_no_intersection_rays, axis=0), index_tri)
+        # #
+        # #     index_ray = np.delete(index_ray, np.where(front_facing == False))
+        # #     index_tri = np.delete(index_tri, np.where(front_facing == False))
+        # #     intersection_points = np.delete(intersection_points, np.where(front_facing == False), axis=0)
+        # #
+        # # eq = npi.group_by(origins[index_ray])
         #
-        #     index_ray = np.delete(index_ray, np.where(front_facing == False))
-        #     index_tri = np.delete(index_tri, np.where(front_facing == False))
-        #     intersection_points = np.delete(intersection_points, np.where(front_facing == False), axis=0)
+        # # locs = trimesh.points.PointCloud(intersection_points)
         #
-        # eq = npi.group_by(origins[index_ray])
+        # # render the result with vtkplotter
+        # axes = vp.addons.buildAxes(vp.trimesh2vtk(self.mesh), c='k', zxGrid2=True)
+        # rays = vp.Lines(origins[0:1083, :], drays[0, 0:1083, :].reshape(-1, 3)+origins[0:1083, :], c='b', scale=200)
+        # locs = vp.Points(intersection_points[0:1083, :], c='r')
+        # # rays = vp.Arrows(origins, drays+start_point, c='b', scale=1000)
+        # normal = vp.Arrows(start_points[0, :].reshape(-1, 3), (face_normals[0, :]+start_points[0, :]).reshape(-1, 3), c='g', scale=250)
+        # vp.show(vp.trimesh2vtk(self.mesh).alpha(0.1).lw(0.1), locs, rays, normal, axes, axes=4)
+        #
+        # # # for each hit, find the distance along its vector
+        # # # you could also do this against the single camera Z vector
+        # # depth = trimesh.util.diagonal_dot(intersection_points - start_point, drays[index_ray])
 
-        # locs = trimesh.points.PointCloud(intersection_points)
-
-        # render the result with vtkplotter
-        axes = vp.addons.buildAxes(vp.trimesh2vtk(self.mesh), c='k', zxGrid2=True)
-        rays = vp.Lines(origins[0:1083,:], drays[0,0:1083,:].reshape(-1,3)+origins[0:1083,:], c='b', scale=200)
-        locs = vp.Points(intersection_points[0:1083,:], c='r')
-        # rays = vp.Arrows(origins, drays+start_point, c='b', scale=1000)
-        normal = vp.Arrows(start_points[0,:].reshape(-1,3), (face_normals[0,:]+start_points[0,:]).reshape(-1,3), c='g', scale=250)
-        vp.show(vp.trimesh2vtk(self.mesh).alpha(0.1).lw(0.1), locs, rays, normal, axes, axes=4)
-
-        # # for each hit, find the distance along its vector
-        # # you could also do this against the single camera Z vector
-        # depth = trimesh.util.diagonal_dot(intersection_points - start_point, drays[index_ray])
-
-        return
+        return self.ffs
 
     def __isFacing(self, startpoints, startpoints_normals, index_tri):
 
@@ -220,7 +232,8 @@ class FormFactor(object):
         # ff = np.ones(self.__patch_count)*i
         self.ffs[i,:] *= i
 
-        # calculate the rotation matrix between the face normal and the isocell unit sphere's original position and rotate the rays accordingly to match the face normal direction
+        # calculate the rotation matrix between the face normal and the isocell unit sphere's
+        # original position and rotate the rays accordingly to match the face normal direction
         face_normal = self.mesh.face_normals[i,:].reshape(-1,3) # corresponding face normal
         drays = ((self.isocell.points @ r.vrrotvec2mat(face_normal, [0, 0, 1]).T).T).reshape(-1, 3)
 
@@ -256,9 +269,64 @@ class FormFactor(object):
         print('[form factor] patch {}/{} ... intersections: {}'.format(i, self.__patch_count, len(intersection_points)))
 
     def __get_faces(self, faces, num_of_vertices=3):
-        return faces.reshape(-1,num_of_vertices+1)[:,1:num_of_vertices+1]
+        return faces.reshape(-1, num_of_vertices+1)[:, 1:num_of_vertices+1]
 
-    def calculate_form_factors_matrix(self, processes=4):
+    def apply_distribution_curve(self, curve=np.array([]), patches=np.array([]), type='ldc'):
+
+        if not patches.any():
+            raise Exception('You need to provide patches where the distribution to be applied.')
+
+        distribution = LightDistributionCurve(curve)
+
+        face_normals = self.mesh.face_normals[patches, :]
+
+        # # get the centroid of the face/patch and shift it a bit so that rays do not stop at the self face thrown from
+        # start_points = self.mesh.triangles_center[patches, :]  # the face/patch center points
+        # offset = np.sign(face_normals)
+        # offset = offset * 1e-3
+        # origins = start_points + offset
+
+        # origins = np.repeat(origins, self.isocell.points.shape[0], axis=0)
+
+        rayPnts = self.__form_factor_properties['drays'][patches, :].reshape(-1, 3) + self.__form_factor_properties['origins'][patches, :].reshape(-1, 3)
+
+        pnts = self.__form_factor_properties['intersection_points'][patches].reshape(-1,3)
+
+        if np.where(np.all(np.isinf(pnts), axis=1)):
+            pnts[np.where(np.all(np.isinf(pnts), axis=1))] = rayPnts[np.where(np.all(np.isinf(pnts), axis=1))]
+
+
+
+
+
+
+
+        test_isocell = copy.deepcopy(self.isocell)
+
+        test_isocell.points = pnts
+
+
+        test_isocell.compute_weights(distribution.properties['symmetric_ldc'], np.repeat(self.mesh.triangles_center[patches, :], self.__n_rays, axis=0))
+
+        # self.isocell.compute_weights(distribution.properties['symmetric_ldc'], np.array([[0, 0, 0]]), type)
+
+    # def apply_ldc(self, curve=np.array([]), patches=np.array([])):
+    #
+    #     if not patches.any():
+    #         raise Exception('You need to provide patches where the distribution to be applied.')
+    #
+    #     self.__apply_distribution_curve(curve, patches)
+    #
+    #
+    # def appl_lsc(self, curve=np.array([]), patches=np.array([])):
+    #
+    #     if not patches.any():
+    #         raise Exception('You need to provide patches where the distribution to be applied.')
+    #
+    #     self.__apply_distribution_curve(curve, patches)
+
+
+    def calculate_form_factors_matrix(self, processes=4, **kwargs):
 
         ffs = self.__calculate_form_factors()
 
@@ -276,7 +344,7 @@ class FormFactor(object):
         #     # ffs = pool.starmap(self.__calculate_one_patch_form_factor, enumerate(np.arange(0,100)))
         #     # pool.starmap(self.__calculate_one_patch_form_factor, enumerate(np.arange(0,100)))
 
-        return np.array(self.ffs)
+        return ffs
 
     # def __call__(self, x):
     #     return self.__calculate_one_patch_form_factor(x)

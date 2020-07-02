@@ -67,7 +67,7 @@ class Isocell(object):
         self.points = []
         self.cell_points = []
 
-        self.weights = []
+        self.weights = {}
 
         self.__isocell_distribution()
 
@@ -167,7 +167,7 @@ class Isocell(object):
         self.Zc = np.real(np.sqrt(1 - Xc.astype(np.complex) ** 2 - Yc.astype(np.complex) ** 2))
         self.cell_points = np.column_stack([self.Xc, self.Yc, self.Zc])
 
-    def compute_weights(self, distribution, points):
+    def compute_weights(self, distribution, points, type='ldc'):
         ''' Compute weight for the isocell rays in correspondence to given origin points, which could be the center of patches for example.'''
         n_vis = self.points.shape[0]
         n_pis = points.shape[0]
@@ -215,5 +215,5 @@ class Isocell(object):
         #     # for i, j in zip(vcenter_to_vpoint_angle_Z_axis, vcenter_to_vpoint_angle_X_axis):
         #     #     weights.append(interpolation(i, j))
 
-        self.weights = np.array(weights)
+        self.weights[type] = np.array(weights)
 
