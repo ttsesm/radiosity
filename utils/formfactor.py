@@ -9,6 +9,8 @@ import numpy as np
 import numpy_indexed as npi
 # from numpy.core.umath_tests import inner1d
 
+from scipy import interpolate
+
 import time
 import open3d as o3d
 
@@ -127,7 +129,10 @@ class FormFactor(object):
         if idxs_of_no_intersection_rays.any():
             # first apply backface culling and filter intersections from rays hitting faces from the back side
             # TODO: this could be addressed optimally by embree if it gets compiled with the corresponding parameter
+            start = time.time()
             front_facing = self.__isFacing(np.delete(origins, idxs_of_no_intersection_rays, axis=0), np.delete(np.repeat(face_normals, self.__n_rays, axis=0), idxs_of_no_intersection_rays, axis=0), index_tri)
+            end = time.time()
+            print('Backface pulling in: {} sec'.format(end - start))
 
             index_ray[np.where(front_facing == False)] = -1
             index_tri[np.where(front_facing == False)] = -1
@@ -154,7 +159,7 @@ class FormFactor(object):
         self.__form_factor_properties['index_tri'] = index_tri
         self.__form_factor_properties['intersection_points'] = intersection_points
 
-        # Bin elements per row from the intersected triangles matrix, i.e. index_tri
+        # Bin elements per row (this means to find how many times each face is intersected from the thrown rays) from the intersected triangles matrix, i.e. index_tri.
         # See:
         # https://stackoverflow.com/questions/62662346/map-amount-of-repeated-elements-row-wise-from-a-numpy-array-to-another?noredirect=1#comment110814113_62662346
         # https://stackoverflow.com/questions/46256279/bin-elements-per-row-vectorized-2d-bincount-for-numpy and
@@ -276,37 +281,45 @@ class FormFactor(object):
         if not patches.any():
             raise Exception('You need to provide patches where the distribution to be applied.')
 
+        # create distribution curve
         distribution = LightDistributionCurve(curve)
 
-        face_normals = self.mesh.face_normals[patches, :]
+        # calculate weights given the above distribution and the corresponding patches (specify the weight of each corresponding emmited ray)
+        # TODO: this possibly could be solved within the isocell.compute_weights in a vectorized way somehow
+        weights = Parallel(n_jobs=5, prefer="threads")(delayed(self.__compute_weights)(distribution.properties['symmetric_ldc'], i, p_1) for i, p_1 in enumerate(patches))
+        # normalize the corresponding weights
+        normalized_weights = self.__n_rays * np.stack(weights).squeeze() / np.sum(weights, axis=-1)
 
-        # # get the centroid of the face/patch and shift it a bit so that rays do not stop at the self face thrown from
-        # start_points = self.mesh.triangles_center[patches, :]  # the face/patch center points
-        # offset = np.sign(face_normals)
-        # offset = offset * 1e-3
-        # origins = start_points + offset
-
-        # origins = np.repeat(origins, self.isocell.points.shape[0], axis=0)
-
-        rayPnts = self.__form_factor_properties['drays'][patches, :].reshape(-1, 3) + self.__form_factor_properties['origins'][patches, :].reshape(-1, 3)
-
-        pnts = self.__form_factor_properties['intersection_points'][patches].reshape(-1,3)
-
-        if np.where(np.all(np.isinf(pnts), axis=1)):
-            pnts[np.where(np.all(np.isinf(pnts), axis=1))] = rayPnts[np.where(np.all(np.isinf(pnts), axis=1))]
+        # apply the corresponding binning based on the weights computed above.
+        # see also:
+        # https://stackoverflow.com/questions/62719951/weighted-numpy-bincount-for-2d-ids-array-and-1d-weights
+        self.ffs[patches.squeeze(), :] = self.__bincount2D(self.__form_factor_properties['index_tri'][patches.squeeze(), :], normalized_weights, sz=self.ffs[patches.squeeze(), :].shape) / self.__n_rays
 
 
+    def __bincount2D(self, id_ar_2D, weights, sz=None):
+        # Inputs : 2D id array, 1D weights array
 
+        # Extent of bins per col
+        if sz == None:
+            n = id_ar_2D.max() + 1
+            N = len(id_ar_2D)
+        else:
+            n = sz[1]
+            N = sz[0]
 
+        if id_ar_2D.shape == weights.shape:
+            W = weights.ravel()
+        else:
+            W = np.tile(weights, N)
 
+        # add offsets to the original values to be used when we apply raveling later on
+        id_ar_2D_offsetted = id_ar_2D + n * np.arange(N)[:, None]
 
+        # Finally use bincount with those 2D bins as flattened and with
+        # flattened b as weights. Reshaping is needed to add back into "a".
+        ids = id_ar_2D_offsetted.ravel()
 
-        test_isocell = copy.deepcopy(self.isocell)
-
-        test_isocell.points = pnts
-
-
-        test_isocell.compute_weights(distribution.properties['symmetric_ldc'], np.repeat(self.mesh.triangles_center[patches, :], self.__n_rays, axis=0))
+        return np.bincount(ids, W, minlength=n * N).reshape(-1, n)
 
         # self.isocell.compute_weights(distribution.properties['symmetric_ldc'], np.array([[0, 0, 0]]), type)
 
@@ -324,6 +337,70 @@ class FormFactor(object):
     #         raise Exception('You need to provide patches where the distribution to be applied.')
     #
     #     self.__apply_distribution_curve(curve, patches)
+
+    def __compute_weights(self, distribution, i, patch):
+        ''' Compute weight for the isocell rays in correspondence to given origin points, which could be the center of patches for example.'''
+        rayPnts = self.__form_factor_properties['drays'][patch, :].reshape(-1, 3) + self.__form_factor_properties['origins'][patch,:].reshape(-1, 3)
+        isocell_points = self.__form_factor_properties['intersection_points'][patch].reshape(-1, 3)
+
+        if np.where(np.all(np.isinf(isocell_points), axis=1)):
+            isocell_points[np.where(np.all(np.isinf(isocell_points), axis=1))] = rayPnts[np.where(np.all(np.isinf(isocell_points), axis=1))]
+
+        n_vis = isocell_points.shape[0]
+        n_pis = self.mesh.triangles_center[patch].shape[0]
+
+        anglesX = np.linspace(0, 180, distribution.shape[0])
+        anglesZ = np.linspace(0, 180, distribution.shape[1])
+
+        # Compute the relative position of each point in the isocell sphere with respect to the given point
+        v_points = (isocell_points - np.repeat(self.mesh.triangles_center[patch][np.newaxis, :], n_vis, axis=1)).reshape(-1,3)
+
+        # Compute the distance between each point in the isocell sphere with respect to the given point
+        norms = np.sqrt(np.sum(v_points * v_points, axis=1))
+
+        # Compute the angle between the principal axis (Z-axis) and the ray connecting the light source to each point
+        v_centerZ = self.__form_factor_properties['rotation_matrices'][patch, 2, :].flatten()
+        vcenter_to_vpoint_angle_Z_axis = np.rad2deg(np.arccos(np.sum(np.repeat(v_centerZ[np.newaxis, :], n_vis*n_pis, axis=0) * v_points, axis=1) / norms))
+
+        # Compute the angle between the principal axis (X-axis) and the ray connecting the light source to each point
+        v_centerX = self.__form_factor_properties['rotation_matrices'][patch, 0, :].flatten()
+        vcenter_to_vpoint_angle_X_axis = np.rad2deg(np.arccos(np.sum(np.repeat(v_centerX[np.newaxis, :], n_vis*n_pis, axis=0) * v_points, axis=1) / norms))
+
+        interpolation = interpolate.interp2d(anglesX, anglesZ, distribution.T)
+
+        weights = np.diagonal(interpolation(vcenter_to_vpoint_angle_Z_axis, vcenter_to_vpoint_angle_X_axis)).reshape(-1,n_vis)
+
+        # self.weights[type] = np.array(weights)
+        return  weights
+
+    # def compute_weights(self, distribution, isocell_points, points, v_centerZ = np.array([0, 0, 1]), v_centerX = np.array([1, 0, 0]), type='ldc'):
+    #     ''' Compute weight for the isocell rays in correspondence to given origin points, which could be the center of patches for example.'''
+    #     n_vis = self.__n_rays
+    #     n_pis = points.shape[0]
+    #
+    #     anglesX = np.linspace(0, 180, distribution.shape[0])
+    #     anglesZ = np.linspace(0, 180, distribution.shape[1])
+    #
+    #     # Compute the relative position of each point in the isocell sphere with respect to the given point
+    #     v_points = (isocell_points - np.repeat(points[np.newaxis, :], n_vis, axis=1)).reshape(-1,3)
+    #
+    #     # Compute the distance between each point in the isocell sphere with respect to the given point
+    #     norms = np.sqrt(np.sum(v_points * v_points, axis=1))
+    #
+    #     # Compute the angle between the principal axis (Z-axis) and the ray connecting the light source to each point
+    #     # v_centerZ = np.array([0, 0, 1])
+    #     vcenter_to_vpoint_angle_Z_axis = np.rad2deg(np.arccos(np.sum(np.repeat(v_centerZ[np.newaxis, :], n_vis*n_pis, axis=0) * v_points, axis=1) / norms))
+    #
+    #     # Compute the angle between the principal axis (X-axis) and the ray connecting the light source to each point
+    #     # v_centerX = np.array([1, 0, 0])
+    #     vcenter_to_vpoint_angle_X_axis = np.rad2deg(np.arccos(np.sum(np.repeat(v_centerX[np.newaxis, :], n_vis*n_pis, axis=0) * v_points, axis=1) / norms))
+    #
+    #     interpolation = interpolate.interp2d(anglesX, anglesZ, distribution.T)
+    #
+    #     weights = np.diagonal(interpolation(vcenter_to_vpoint_angle_Z_axis, vcenter_to_vpoint_angle_X_axis)).reshape(-1,n_vis)
+    #
+    #     # self.weights[type] = np.array(weights)
+    #     return  weights
 
 
     def calculate_form_factors_matrix(self, processes=4, **kwargs):

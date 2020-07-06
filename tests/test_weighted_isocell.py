@@ -28,7 +28,7 @@ def plot_weighted_isocell(isocell):
 
 
 def test_isocell():
-    isocell = Isocell(rays=2000, div=3, isrand=0, draw_cells=True)
+    isocell = Isocell(rays=1000, div=3, isrand=0, draw_cells=True)
     ldc = LightDistributionCurve()
 
     isocell.compute_weights(ldc.properties['symmetric_ldc'], np.array([[0, 0, 0]]))

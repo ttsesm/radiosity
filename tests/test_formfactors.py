@@ -126,8 +126,11 @@ def test_formfactors():
     # vp.show(vp.trimesh2vtk(mesh).alpha(0.1).lw(0.1), axes=4)
 
     # ff = FormFactor(mesh)
-    # ffs = FormFactor(mesh).calculate_form_factor(processes=5)
-    ffs = FormFactor(mesh).calculate_form_factors_matrix(processes=multiprocessing.cpu_count() - 1)
+    # ffs = FormFactor(mesh).calculate_form_factors_matrix(processes=5)
+    # ffs = FormFactor(mesh).calculate_form_factors_matrix(processes=multiprocessing.cpu_count() - 1)
+    F = FormFactor(mesh)
+    F.calculate_form_factors_matrix()
+    F.apply_distribution_curve(patches=light_patches)
 
     print('End testing the form factors module!!!!')
     # plt.show()
