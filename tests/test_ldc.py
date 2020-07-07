@@ -13,22 +13,6 @@ import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.use('Qt5Agg')
 
-# def plotting_thread():
-#     ldc = LightDistributionCurve()
-#     ldc.plot2D(inline=True, type='normalized')
-#
-# def plotting_thread2():
-#     ldc = LightDistributionCurve()
-#     ldc.plot3D()
-
-def test_vvrotvec():
-    rot = r.vvrotvec([0, 0, 0], [0, 1, 0])
-
-    M = r.vrrotvec2mat(rot)
-
-    print(rot)
-
-
 def test_ldc():
 
     ldc = LightDistributionCurve()
@@ -72,15 +56,12 @@ def test_ldc():
 
 if __name__ == '__main__':
     print('Testing the LightDistributionCurve module!!!!')
-    # proc = multiprocessing.Process(target=plotting_thread, args=())
-    # proc.daemon = False
-    # proc.start()
-    # proc2 = multiprocessing.Process(target=plotting_thread2, args=())
+
+    # proc2 = multiprocessing.Process(target=plot_mesh, args=())
     # proc2.daemon = False
     # proc2.start()
     # # time.sleep(1)
 
-    test_vvrotvec()
     test_ldc()
     print("exiting main")
     os._exit(0)  # this exits immediately with no cleanup or buffer flushing
