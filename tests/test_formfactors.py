@@ -19,8 +19,6 @@ import pyembree
 # from pyoctree import pyoctree as ot
 import vtkplotter as vp
 
-print("testss!!!!")
-
 from numba import jit, cuda
 
 def plot_mesh(verts, faces):

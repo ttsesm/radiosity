@@ -10,3 +10,4 @@ from utils.isocell import Isocell
 from utils.ldc import LightDistributionCurve
 from utils import rotation
 from utils.formfactor import FormFactor
+from utils.radiosity import Radiosity
