@@ -46,7 +46,7 @@ class Radiosity(object):
         if isinstance(rho, int):
             ffs = rho * ffs
         else:
-            ffs = np.diag(rho) * ffs
+            ffs = np.diag(rho) @ ffs
 
         self.F = np.eye(nbf) - ffs
 
@@ -58,6 +58,7 @@ class Radiosity(object):
 
     def solve(self, method=0, itermax=30):
 
+        # TODO: quite slow, check whether it can be optimized somehow
         if method == 0:
             self.r = self.__direct_radiosity_solution()
         elif method == 1:

@@ -225,11 +225,12 @@ def test_radiosity():
     # Solve for color vector.
     # The parameter rho adjusts the surface material(how much incoming light
     # is reflected away from a patch, 0 < rho <= 1)
-    rho = 1
+    # rho = 1
+    rho = np.ones(Evec.size)
 
     del X, Xmat, Y, Ymat, Z, Zmat, cosiii, cosjjj, piii, pjjj, tmp, tmp2, d, difvec, n, pi, r, sc_par, s, width
 
-    r = Radiosity(F, rho, Evec).solve(method=0)[0]
+    r = Radiosity(F, rho, Evec).solve(method=1)[0]
 
     print('End testing the radiosity module!!!!')
 
