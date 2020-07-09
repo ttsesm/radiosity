@@ -134,7 +134,7 @@ def test_formfactors():
     # plt.show()
 
 # function optimized to run on gpu
-@jit(target ='cuda')
+@cuda.jit
 def func2(a):
     for i in range(10000000):
         a[i]+= 1
