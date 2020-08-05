@@ -19,8 +19,6 @@ import pyembree
 # from pyoctree import pyoctree as ot
 import vtkplotter as vp
 
-print("testss!!!!")
-
 from numba import jit, cuda
 
 def plot_mesh(verts, faces):
@@ -136,7 +134,7 @@ def test_formfactors():
     # plt.show()
 
 # function optimized to run on gpu
-@jit(target ='cuda')
+@cuda.jit
 def func2(a):
     for i in range(10000000):
         a[i]+= 1

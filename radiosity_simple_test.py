@@ -10,7 +10,6 @@ from matplotlib import cm
 from matplotlib.ticker import LinearLocator, FormatStrFormatter
 import matplotlib.colors as colors
 
-from mayavi import mlab
 # mlab.options.backend = 'envisage'
 import pyvista as pv
 

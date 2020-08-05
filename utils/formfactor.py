@@ -14,7 +14,6 @@ from scipy import interpolate
 import time
 import open3d as o3d
 
-import vtk
 import pyvista as pv
 
 from utils.triangle import Triangle, vectorize, distance
@@ -23,7 +22,6 @@ from utils import Isocell
 from utils import LightDistributionCurve
 import trimesh
 import pyembree
-# from pyoctree import pyoctree as ot
 import vtkplotter as vp
 
 from utils import rotation as r
@@ -67,8 +65,6 @@ class FormFactor(object):
         # correct the number of rays created from the isocell casting
         self.__n_rays = self.isocell.points.shape[0]
         self.__form_factor_properties = {}
-
-        print()
 
     # # function optimized to run on gpu
     # @jit(target="cuda")
