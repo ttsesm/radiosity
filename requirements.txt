@@ -25,7 +25,7 @@ matplotlib==3.2.1
 mayavi @ https://github.com/enthought/mayavi/zipball/master
 meshio==4.0.13
 mistune==0.8.4
-nbconvert==5.6.1
+nbconvert==6.3.0
 nbformat==5.0.6
 notebook==6.0.3
 numexpr==2.7.1
